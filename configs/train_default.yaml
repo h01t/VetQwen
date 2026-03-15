@@ -1,0 +1,93 @@
+# VetQwen — Default Training Configuration
+# Primary run: LoRA rank 16, full dataset
+# Override individual fields via CLI: --config configs/train_default.yaml --lora-r 32
+
+# -------------------------------------------------------------------
+# Model
+# -------------------------------------------------------------------
+model:
+  name: "Qwen/Qwen2.5-3B-Instruct"
+  revision: "main"
+  trust_remote_code: true
+
+# -------------------------------------------------------------------
+# BitsAndBytes 4-bit quantization
+# -------------------------------------------------------------------
+quantization:
+  load_in_4bit: true
+  bnb_4bit_quant_type: "nf4"           # NF4 quantization
+  bnb_4bit_compute_dtype: "bfloat16"   # bf16 for RTX 30-series; fall back to fp16 if needed
+  bnb_4bit_use_double_quant: true      # Nested quantization — saves ~0.4GB
+
+# -------------------------------------------------------------------
+# LoRA / PEFT
+# -------------------------------------------------------------------
+lora:
+  r: 16                                # Rank — ablate: 8 / 16 / 32
+  lora_alpha: 32
+  lora_dropout: 0.05
+  bias: "none"
+  task_type: "CAUSAL_LM"
+  target_modules:
+    - "q_proj"
+    - "k_proj"
+    - "v_proj"
+    - "o_proj"
+    - "gate_proj"
+    - "up_proj"
+    - "down_proj"
+
+# -------------------------------------------------------------------
+# Data
+# -------------------------------------------------------------------
+data:
+  train_file: "data/processed/train.jsonl"
+  val_file: "data/processed/val.jsonl"
+  test_file: "data/processed/test.jsonl"
+  max_seq_length: 512                  # Reduce to 384 if OOM during training
+  dataset_fraction: 1.0                # Ablation: 0.5 / 0.25 for data size sensitivity
+
+# -------------------------------------------------------------------
+# Training (SFTTrainer / SFTConfig)
+# -------------------------------------------------------------------
+training:
+  output_dir: "./checkpoints"
+  num_train_epochs: 3
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 1
+  gradient_accumulation_steps: 16     # Effective batch size = 16
+  gradient_checkpointing: true        # Critical for 8GB VRAM
+  optim: "paged_adamw_8bit"           # Memory-efficient optimizer
+  learning_rate: 2.0e-4
+  lr_scheduler_type: "cosine"
+  warmup_ratio: 0.05
+  bf16: true                          # Set to false and fp16: true on non-Ampere GPUs
+  fp16: false
+  logging_steps: 10
+  eval_strategy: "steps"
+  eval_steps: 50
+  save_strategy: "steps"
+  save_steps: 50                      # Must match eval_steps for load_best_model_at_end
+  save_total_limit: 2
+  load_best_model_at_end: true
+  metric_for_best_model: "eval_loss"
+  report_to: "tensorboard"
+  run_name: "vetqwen_r16_full"        # Run name — override per ablation
+
+# -------------------------------------------------------------------
+# Inference / generation (used during evaluation)
+# -------------------------------------------------------------------
+generation:
+  temperature: 0.3
+  top_p: 0.9
+  max_new_tokens: 350
+  do_sample: true
+
+# -------------------------------------------------------------------
+# Ablation presets (reference — pass run_name and override fields)
+# -------------------------------------------------------------------
+# Run A: lora.r=8,  data.dataset_fraction=1.0, training.run_name=vetqwen_r8_full
+# Run B: lora.r=16, data.dataset_fraction=1.0, training.run_name=vetqwen_r16_full  (default)
+# Run C: lora.r=32, data.dataset_fraction=1.0, training.run_name=vetqwen_r32_full
+# Run D: lora.r=16, data.dataset_fraction=0.5, training.run_name=vetqwen_r16_half
+# Run E: lora.r=16, data.dataset_fraction=0.25, training.run_name=vetqwen_r16_quarter

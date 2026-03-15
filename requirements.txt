@@ -1,0 +1,21 @@
+# VetQwen dependencies
+# ---------------------------------------------------------------
+# IMPORTANT: Install PyTorch with CUDA *before* installing these:
+#   pip install torch==2.4.1 --index-url https://download.pytorch.org/whl/cu121
+# Then install the rest:
+#   pip install -r requirements.txt
+# ---------------------------------------------------------------
+transformers==4.44.2
+peft==0.12.0
+trl==0.9.6
+bitsandbytes==0.43.3
+accelerate==0.33.0
+datasets>=2.20.0
+tensorboard>=2.17.0
+rouge-score>=0.1.2
+bert-score>=0.3.13
+sentence-transformers>=3.0.0
+gradio>=4.40.0
+pyyaml>=6.0
+requests>=2.32.0
+numpy>=1.26.0

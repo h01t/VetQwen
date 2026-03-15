@@ -1,0 +1,72 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# project plan
+vetqwen_project_plan.md
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+
+# Model sessions
+sessions/
+sessions/**
+
+# Environment variables
+.env
+.env.*
+
+# Model artifacts — large binary files, not tracked in git
+adapter/
+# (adapter/.gitkeep is explicitly tracked via force-add)
+
+# Training checkpoints
+checkpoints/
+
+# TensorBoard logs (inside checkpoints, but just in case)
+runs/
+
+# Evaluation results (regeneratable)
+results/*
+!results/.gitkeep
+
+# PyTorch / HuggingFace model weights
+*.pt
+*.pth
+*.bin
+*.safetensors
+*.gguf
+*.ggml
+
+# HuggingFace cache
+.cache/
+
+# Data — raw downloads (large, re-downloadable)
+data/raw/*
+!data/raw/.gitkeep
+
+# Processed data (regeneratable, can be large)
+data/processed/*
+!data/processed/.gitkeep
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
