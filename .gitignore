@@ -61,6 +61,10 @@ data/raw/*
 data/processed/*
 !data/processed/.gitkeep
 
+# Manual review exports (generated)
+data/review/*
+!data/review/.gitkeep
+
 # OS
 .DS_Store
 Thumbs.db

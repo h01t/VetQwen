@@ -7,34 +7,33 @@ Loads the fine-tuned LoRA adapter on top of Qwen2.5-3B-Instruct.
 Usage:
     python app/gradio_demo.py --adapter ./adapter
     python app/gradio_demo.py --adapter ./adapter --base-model Qwen/Qwen2.5-3B-Instruct --share
-    python app/gradio_demo.py --adapter ./adapter --cpu  # CPU inference (slow)
+    python app/gradio_demo.py --adapter ./adapter --device cpu
 """
+
+from __future__ import annotations
 
 import argparse
 import logging
 from pathlib import Path
+import sys
 
-import torch
+ROOT = Path(__file__).resolve().parents[1]
+SCRIPTS_DIR = ROOT / "scripts"
+if str(SCRIPTS_DIR) not in sys.path:
+    sys.path.insert(0, str(SCRIPTS_DIR))
+
+from vetqwen_core.constants import DEFAULT_ADAPTER, DEFAULT_BASE_MODEL
+from vetqwen_core.inference import (
+    generate_chat_response,
+    load_inference_model,
+    resolve_device,
+)
+from vetqwen_core.records import build_patient_prompt
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 log = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Default model settings
-# ---------------------------------------------------------------------------
-
-DEFAULT_BASE_MODEL = "Qwen/Qwen2.5-3B-Instruct"
-DEFAULT_ADAPTER = "./adapter"
-
-SYSTEM_PROMPT = (
-    "You are VetQwen, an expert veterinary diagnostic assistant. "
-    "Given a patient signalment and clinical symptoms, provide a structured "
-    "differential diagnosis with clinical reasoning, ranked differentials, and "
-    "a triage recommendation. Always remind the user that your output is not a "
-    "substitute for professional veterinary examination."
-)
 
 # Example cases for the UI
 EXAMPLES = [
@@ -80,77 +79,40 @@ DISCLAIMER = (
 
 _model = None
 _tokenizer = None
+_resolved_device = None
 
 
-def load_model(adapter_path: str, base_model: str, use_cpu: bool = False):
-    global _model, _tokenizer
+def load_model(adapter_path: str, base_model: str, device: str = "auto"):
+    global _model, _tokenizer, _resolved_device
 
     if _model is not None:
         return _model, _tokenizer
 
-    from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig  # type: ignore
-
-    log.info(f"Loading base model: {base_model}")
-
-    if use_cpu:
-        # CPU mode: no quantization
-        from peft import PeftModel  # type: ignore
-
-        _model = AutoModelForCausalLM.from_pretrained(
-            base_model, trust_remote_code=True, torch_dtype=torch.float32
+    _resolved_device = resolve_device(device)
+    model_path = adapter_path
+    model_base = base_model
+    if not Path(adapter_path).exists():
+        log.warning(
+            "Adapter path '%s' not found — running base model only (no fine-tuning applied).",
+            adapter_path,
         )
-        if Path(adapter_path).exists():
-            _model = PeftModel.from_pretrained(_model, adapter_path)
-    else:
-        bnb_config = BitsAndBytesConfig(
-            load_in_4bit=True,
-            bnb_4bit_quant_type="nf4",
-            bnb_4bit_compute_dtype=torch.bfloat16,
-            bnb_4bit_use_double_quant=True,
-        )
+        model_path = base_model
+        model_base = None
 
-        _model = AutoModelForCausalLM.from_pretrained(
-            base_model,
-            quantization_config=bnb_config,
-            device_map={"": 0},
-            trust_remote_code=True,
-        )
-
-        if Path(adapter_path).exists():
-            from peft import PeftModel  # type: ignore
-
-            log.info(f"Loading LoRA adapter from: {adapter_path}")
-            _model = PeftModel.from_pretrained(_model, adapter_path)
-        else:
-            log.warning(
-                f"Adapter path '{adapter_path}' not found — running base model only (no fine-tuning applied)."
-            )
-
-    _tokenizer = AutoTokenizer.from_pretrained(base_model, trust_remote_code=True)
-    if _tokenizer.pad_token is None:
-        _tokenizer.pad_token = _tokenizer.eos_token
-    _tokenizer.padding_side = "left"
-
-    _model.eval()
-    log.info("Model ready.")
+    log.info("Loading demo model on device=%s", _resolved_device)
+    _model, _tokenizer, _resolved_device = load_inference_model(
+        model_path,
+        model_base,
+        device=_resolved_device,
+        enforce_supported_python=False,
+    )
+    log.info("Model ready on device=%s.", _resolved_device)
     return _model, _tokenizer
 
 
 # ---------------------------------------------------------------------------
 # Inference
 # ---------------------------------------------------------------------------
-
-
-def format_prompt(species: str, age: str, sex: str, breed: str, complaint: str) -> str:
-    parts = [f"Species: {species}"]
-    if age:
-        parts.append(f"Age: {age}")
-    if sex:
-        parts.append(f"Sex: {sex}")
-    if breed:
-        parts.append(f"Breed: {breed}")
-    parts.append(f"Presenting complaint: {complaint}")
-    return "\n".join(parts)
 
 
 def diagnose(
@@ -167,32 +129,24 @@ def diagnose(
 
     model, tokenizer = _model, _tokenizer
     if model is None or tokenizer is None:
-        return "Model not loaded. Please restart the demo with a valid --adapter path."
+        return "Model not loaded. Please restart the demo with a valid model configuration."
 
-    user_content = format_prompt(species, age, sex, breed, complaint)
-    messages = [
-        {"role": "system", "content": SYSTEM_PROMPT},
-        {"role": "user", "content": user_content},
-    ]
-
-    text = tokenizer.apply_chat_template(
-        messages, tokenize=False, add_generation_prompt=True
+    user_content = build_patient_prompt(
+        species=species,
+        complaint=complaint,
+        age=age or None,
+        sex=sex or None,
+        breed=breed or None,
     )
-    inputs = tokenizer(text, return_tensors="pt").to(model.device)
-
-    with torch.no_grad():
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=int(max_new_tokens),
-            temperature=float(temperature),
-            top_p=0.9,
-            do_sample=True,
-            pad_token_id=tokenizer.pad_token_id,
-        )
-
-    new_tokens = outputs[0][inputs["input_ids"].shape[1] :]
-    response = tokenizer.decode(new_tokens, skip_special_tokens=True).strip()
-    return response
+    return generate_chat_response(
+        model,
+        tokenizer,
+        user_content,
+        do_sample=True,
+        temperature=float(temperature),
+        top_p=0.9,
+        max_new_tokens=int(max_new_tokens),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -200,11 +154,11 @@ def diagnose(
 # ---------------------------------------------------------------------------
 
 
-def build_demo(adapter_path: str, base_model: str, use_cpu: bool):
+def build_demo(adapter_path: str, base_model: str, device: str):
     import gradio as gr  # type: ignore
 
     # Pre-load model
-    load_model(adapter_path, base_model, use_cpu)
+    load_model(adapter_path, base_model, device)
 
     def _diagnose(species, age, sex, breed, complaint, temperature, max_new_tokens):
         return diagnose(
@@ -330,13 +284,15 @@ def main() -> None:
         help="Create a public Gradio share link",
     )
     parser.add_argument(
-        "--cpu",
-        action="store_true",
-        help="Run in CPU mode (no quantization, very slow)",
+        "--device",
+        type=str,
+        default="auto",
+        choices=["auto", "cpu", "cuda"],
+        help="Inference device to use (default: auto)",
     )
     args = parser.parse_args()
 
-    demo = build_demo(args.adapter, args.base_model, args.cpu)
+    demo = build_demo(args.adapter, args.base_model, args.device)
     demo.launch(server_port=args.port, share=args.share)
 
 

@@ -13,9 +13,6 @@ import argparse
 import logging
 from pathlib import Path
 
-import torch
-import yaml
-
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
@@ -28,17 +25,10 @@ log = logging.getLogger(__name__)
 
 
 def load_config(path: str) -> dict:
+    import yaml
+
     with open(path) as f:
         return yaml.safe_load(f)
-
-
-def apply_overrides(cfg: dict, overrides: dict) -> dict:
-    """Apply flat key overrides to a nested config dict (dot notation not required here)."""
-    for key, value in overrides.items():
-        if value is not None:
-            # Top-level keys only for now — extend with dot notation if needed
-            cfg[key] = value
-    return cfg
 
 
 # ---------------------------------------------------------------------------
@@ -47,6 +37,7 @@ def apply_overrides(cfg: dict, overrides: dict) -> dict:
 
 
 def load_model_and_tokenizer(cfg: dict):
+    import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig  # type: ignore
 
     model_name = cfg["model"]["name"]

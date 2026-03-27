@@ -18,10 +18,12 @@ import argparse
 import json
 import logging
 import random
+import re
 import time
 from pathlib import Path
 
-import requests
+from vetqwen_core.records import build_structured_response, make_chatml_record
+from vetqwen_core.text import canonicalize_triage, clean_text
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
@@ -34,14 +36,6 @@ log = logging.getLogger(__name__)
 
 DEFAULT_OLLAMA_BASE_URL = "http://localhost:11434"
 DEFAULT_OLLAMA_MODEL = "qwen2.5:7b"
-
-SYSTEM_PROMPT = (
-    "You are VetQwen, an expert veterinary diagnostic assistant. "
-    "Given a patient signalment and clinical symptoms, provide a structured "
-    "differential diagnosis with clinical reasoning, ranked differentials, and "
-    "a triage recommendation. Always remind the user that your output is not a "
-    "substitute for professional veterinary examination."
-)
 
 SPECIES_POOL = ["Cattle", "Pig", "Sheep"]
 
@@ -78,6 +72,8 @@ Species: {species}
 
 def check_ollama(base_url: str, model: str) -> bool:
     """Verify Ollama is running and the target model is available."""
+    import requests
+
     try:
         resp = requests.get(f"{base_url}/api/tags", timeout=5)
         resp.raise_for_status()
@@ -91,10 +87,21 @@ def check_ollama(base_url: str, model: str) -> bool:
         return False
 
 
+def canonicalize_condition(value: object) -> str | None:
+    text = clean_text(value).casefold()
+    if not text:
+        return None
+    text = re.sub(r"[^a-z0-9\s/&-]", "", text)
+    text = re.sub(r"\s+", " ", text).strip(" -")
+    return text or None
+
+
 def generate_via_ollama(
     prompt: str, base_url: str, model: str, temperature: float = 0.8
 ) -> str | None:
     """Send a generation request to Ollama and return the raw text response."""
+    import requests
+
     payload = {
         "model": model,
         "prompt": prompt,
@@ -172,27 +179,35 @@ def case_to_chatml(species: str, case: dict) -> dict:
     diff_lines = []
     for d in sorted(diffs, key=lambda x: x.get("rank", 99)):
         diff_lines.append(f"{d['rank']}. {d['diagnosis']} — {d['rationale']}")
-    diff_str = "\n".join(diff_lines) if diff_lines else "1. Requires further evaluation"
-
-    assistant_content = (
-        f"**Species & Signalment:** {species}, {case['signalment']}\n"
-        f"**Presenting Symptoms:** {case['complaint']}\n\n"
-        f"**Assessment:**\n"
-        f"Based on the reported clinical signs ({case['signs']}), the following differentials are considered.\n\n"
-        f"**Differential Diagnoses (ranked by likelihood):**\n{diff_str}\n\n"
-        f"**Triage Recommendation:** {case['triage']}\n"
-        f"**Suggested Next Steps:** Consult a large animal veterinarian for physical examination and targeted diagnostics.\n\n"
-        f"*Note: This output is not a substitute for professional veterinary examination.*"
+    triage = canonicalize_triage(case.get("triage")) or "Schedule within 48h"
+    assistant_content = build_structured_response(
+        species=species.strip().lower(),
+        presenting_symptoms=case["complaint"],
+        signalment=case["signalment"],
+        assessment=(
+            f"Based on the reported clinical signs ({case['signs']}), "
+            "the following differentials are considered."
+        ),
+        differential_lines=diff_lines or ["1. Requires further evaluation — More diagnostics are needed."],
+        triage=triage,
+        next_steps="Consult a large animal veterinarian for physical examination and targeted diagnostics.",
     )
 
-    return {
-        "messages": [
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": user_content},
-            {"role": "assistant", "content": assistant_content},
-        ],
-        "_meta": {"source": "synthetic_ollama", "species": species},
-    }
+    primary_condition = None
+    if diffs:
+        primary_condition = canonicalize_condition(
+            sorted(diffs, key=lambda x: x.get("rank", 99))[0].get("diagnosis", "")
+        )
+    return make_chatml_record(
+        user_content=user_content,
+        assistant_content=assistant_content,
+        source="synthetic_ollama",
+        species=species.strip().lower(),
+        condition=primary_condition,
+        triage=triage,
+        source_labels=[],
+        condition_source="synthetic_primary_differential",
+    )
 
 
 # ---------------------------------------------------------------------------
