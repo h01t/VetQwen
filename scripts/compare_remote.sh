@@ -25,13 +25,12 @@ Usage:
 Defaults:
   - Derives --output when omitted
   - Pulls the markdown summary and JSON sidecar back automatically
+  - Requires uv to be installed on the remote host
 
 Environment overrides:
   VETQWEN_REMOTE_HOST
   VETQWEN_REMOTE_DIR
   VETQWEN_REMOTE_PYTHON
-  VETQWEN_REMOTE_TORCH_VERSION
-  VETQWEN_REMOTE_TORCH_INDEX_URL
 EOF
     exit 0
 fi

@@ -21,6 +21,7 @@ import random
 import re
 import time
 from pathlib import Path
+from typing import Any
 
 from vetqwen_core.records import build_structured_response, make_chatml_record
 from vetqwen_core.text import canonicalize_triage, clean_text
@@ -156,13 +157,113 @@ def generate_case(species: str, base_url: str, model: str) -> dict | None:
         log.warning(f"Failed to parse JSON for {species}: {e}\nRaw: {raw[:200]}")
         return None
 
-    # Validate required keys
-    required = {"signalment", "complaint", "signs", "differentials", "triage"}
-    if not required.issubset(data.keys()):
-        log.warning(f"Missing keys in generated case: {required - set(data.keys())}")
+    normalized = normalize_generated_case(data)
+    if normalized is None:
+        log.warning("Discarding malformed generated case for %s", species)
         return None
 
-    return data
+    return normalized
+
+
+def _coerce_rank(value: Any, fallback: int) -> int:
+    if isinstance(value, bool):
+        return fallback
+    if isinstance(value, int):
+        return max(value, 1)
+    if isinstance(value, float):
+        return max(int(value), 1)
+    text = clean_text(value)
+    if not text:
+        return fallback
+    match = re.search(r"\d+", text)
+    if not match:
+        return fallback
+    return max(int(match.group(0)), 1)
+
+
+def _clean_case_field(value: Any) -> str:
+    if isinstance(value, (list, tuple)):
+        value = ", ".join(clean_text(item) for item in value if clean_text(item))
+    elif isinstance(value, dict):
+        return ""
+    return clean_text(value)
+
+
+def normalize_generated_case(data: dict[str, Any]) -> dict[str, Any] | None:
+    required = {"signalment", "complaint", "signs", "differentials", "triage"}
+    if not required.issubset(data.keys()):
+        log.warning("Missing keys in generated case: %s", required - set(data.keys()))
+        return None
+
+    signalment = _clean_case_field(data.get("signalment"))
+    complaint = _clean_case_field(data.get("complaint"))
+    signs = _clean_case_field(data.get("signs"))
+    triage = canonicalize_triage(data.get("triage")) or "Schedule within 48h"
+    if not signalment or not complaint or not signs:
+        log.warning("Generated case is missing one or more core text fields.")
+        return None
+
+    raw_differentials = data.get("differentials")
+    if not isinstance(raw_differentials, list):
+        log.warning("Generated case differentials field is not a list.")
+        return None
+
+    normalized_differentials: list[dict[str, Any]] = []
+    for index, differential in enumerate(raw_differentials, start=1):
+        diagnosis = ""
+        rationale = ""
+        rank = index
+
+        if isinstance(differential, dict):
+            diagnosis = _clean_case_field(
+                differential.get("diagnosis")
+                or differential.get("condition")
+                or differential.get("name")
+            )
+            rationale = _clean_case_field(
+                differential.get("rationale")
+                or differential.get("reasoning")
+                or differential.get("reason")
+                or differential.get("justification")
+            )
+            rank = _coerce_rank(differential.get("rank"), fallback=index)
+        elif isinstance(differential, str):
+            diagnosis = clean_text(differential)
+
+        if not diagnosis:
+            continue
+        if not rationale:
+            rationale = "Compatible with the reported signalment and clinical signs."
+
+        normalized_differentials.append(
+            {
+                "rank": rank,
+                "diagnosis": diagnosis,
+                "rationale": rationale,
+            }
+        )
+
+    normalized_differentials.sort(key=lambda item: (item["rank"], item["diagnosis"]))
+    normalized_differentials = normalized_differentials[:3]
+    for index, differential in enumerate(normalized_differentials, start=1):
+        differential["rank"] = index
+
+    if not normalized_differentials:
+        normalized_differentials.append(
+            {
+                "rank": 1,
+                "diagnosis": "Requires further evaluation",
+                "rationale": "The generated case did not include a usable ranked differential.",
+            }
+        )
+
+    return {
+        "signalment": signalment,
+        "complaint": complaint,
+        "signs": signs,
+        "differentials": normalized_differentials,
+        "triage": triage,
+    }
 
 
 def case_to_chatml(species: str, case: dict) -> dict:
@@ -177,8 +278,18 @@ def case_to_chatml(species: str, case: dict) -> dict:
     # Build ranked differential list
     diffs = case.get("differentials", [])
     diff_lines = []
-    for d in sorted(diffs, key=lambda x: x.get("rank", 99)):
-        diff_lines.append(f"{d['rank']}. {d['diagnosis']} — {d['rationale']}")
+    for d in sorted(
+        [d for d in diffs if isinstance(d, dict) and d.get("diagnosis")],
+        key=lambda x: x.get("rank", 99),
+    ):
+        rank = _coerce_rank(d.get("rank"), fallback=len(diff_lines) + 1)
+        diagnosis = _clean_case_field(d.get("diagnosis"))
+        rationale = _clean_case_field(d.get("rationale"))
+        if not diagnosis:
+            continue
+        if not rationale:
+            rationale = "Compatible with the reported signalment and clinical signs."
+        diff_lines.append(f"{rank}. {diagnosis} — {rationale}")
     triage = canonicalize_triage(case.get("triage")) or "Schedule within 48h"
     assistant_content = build_structured_response(
         species=species.strip().lower(),
@@ -252,7 +363,22 @@ def main(args: argparse.Namespace) -> None:
                 time.sleep(1)
                 continue
 
-            chatml = case_to_chatml(species, case)
+            try:
+                chatml = case_to_chatml(species, case)
+            except Exception as exc:
+                failed += 1
+                log.warning(
+                    "Failed to convert generated case for %s into ChatML: %s",
+                    species,
+                    exc,
+                )
+                if failed > target_n * 0.3:
+                    log.error(
+                        "Too many failures — check Ollama output quality and model stability."
+                    )
+                    break
+                time.sleep(1)
+                continue
             f_out.write(json.dumps(chatml, ensure_ascii=False) + "\n")
             f_out.flush()
             generated.append(chatml)

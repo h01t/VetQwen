@@ -4,10 +4,8 @@ REMOTE_COMMON_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd -- "$REMOTE_COMMON_DIR/.." && pwd)"
 
 REMOTE_HOST="${VETQWEN_REMOTE_HOST:-blackbox}"
-REMOTE_DIR="${VETQWEN_REMOTE_DIR:-~/vetqwen}"
-REMOTE_PYTHON="${VETQWEN_REMOTE_PYTHON:-python3.11}"
-REMOTE_TORCH_VERSION="${VETQWEN_REMOTE_TORCH_VERSION:-2.4.1}"
-REMOTE_TORCH_INDEX_URL="${VETQWEN_REMOTE_TORCH_INDEX_URL:-https://download.pytorch.org/whl/cu121}"
+REMOTE_DIR="${VETQWEN_REMOTE_DIR:-~/Dev/vetqwen}"
+REMOTE_PYTHON="${VETQWEN_REMOTE_PYTHON:-auto}"
 REMOTE_OLLAMA_URL="${VETQWEN_REMOTE_OLLAMA_URL:-http://127.0.0.1:11434}"
 REMOTE_JUDGE_MODEL="${VETQWEN_REMOTE_JUDGE_MODEL:-}"
 DEFAULT_BASE_MODEL="Qwen/Qwen2.5-3B-Instruct"
@@ -57,7 +55,11 @@ remote_print_context() {
     echo "=== $title ==="
     echo "Remote host: $REMOTE_HOST"
     echo "Remote dir:  $REMOTE_DIR"
-    echo "Python:      $REMOTE_PYTHON"
+    if [[ "$REMOTE_PYTHON" == "auto" ]]; then
+        echo "Python:      auto (prefers python3.11, then python3.12, then python3)"
+    else
+        echo "Python:      $REMOTE_PYTHON"
+    fi
 }
 
 remote_ensure_project_dir() {
@@ -85,6 +87,10 @@ remote_bootstrap_env() {
     shift || true
     local preflight_args
     preflight_args="$(quote_args "$@")"
+    local dependency_group="research"
+    if [[ "$profile" == "demo" ]]; then
+        dependency_group="demo"
+    fi
 
     echo ""
     echo "=== Bootstrapping remote environment ==="
@@ -92,20 +98,68 @@ remote_bootstrap_env() {
 set -euo pipefail
 cd $REMOTE_DIR
 
-if [ ! -d .venv ]; then
-    echo Creating remote virtualenv with $REMOTE_PYTHON
-    $REMOTE_PYTHON -m venv .venv
+if ! command -v uv >/dev/null 2>&1; then
+    echo \"uv is required on $REMOTE_HOST but was not found on PATH.\" >&2
+    echo \"Install uv on the workstation first, then rerun this wrapper.\" >&2
+    exit 1
 fi
 
-source .venv/bin/activate
-python -m pip install --upgrade pip
+requested_python=$REMOTE_PYTHON
+resolved_python=\"\"
+resolved_python_path=\"\"
 
-if ! python -c \"import torch\" >/dev/null 2>&1; then
-    python -m pip install torch==$REMOTE_TORCH_VERSION --index-url $REMOTE_TORCH_INDEX_URL
+resolve_system_python() {
+    local candidate=\"\$1\"
+    local candidate_path=\"\"
+    local candidate_realpath=\"\"
+
+    candidate_path=\"\$(command -v \"\$candidate\" 2>/dev/null || true)\"
+    if [[ -z \"\$candidate_path\" ]]; then
+        return 1
+    fi
+
+    if ! \"\$candidate_path\" --version >/dev/null 2>&1; then
+        return 1
+    fi
+
+    candidate_realpath=\"\$(readlink -f \"\$candidate_path\" 2>/dev/null || printf '%s' \"\$candidate_path\")\"
+    if [[ \"\$candidate_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
+        return 1
+    fi
+
+    resolved_python=\"\$candidate\"
+    resolved_python_path=\"\$candidate_realpath\"
+    return 0
+}
+
+if [[ \"\$requested_python\" == \"auto\" ]]; then
+    for candidate in python3.11 python3.12 python3; do
+        if resolve_system_python \"\$candidate\"; then
+            break
+        fi
+    done
+else
+    if ! resolve_system_python \"\$requested_python\"; then
+        requested_path=\"\$(command -v \"\$requested_python\" 2>/dev/null || true)\"
+        requested_realpath=\"\$(readlink -f \"\$requested_path\" 2>/dev/null || printf '%s' \"\$requested_path\")\"
+        if [[ -n \"\$requested_realpath\" && \"\$requested_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
+            echo \"Requested Python '\$requested_python' resolves to a uv-managed interpreter, which is excluded by --no-managed-python.\" >&2
+            echo \"Set VETQWEN_REMOTE_PYTHON to a system interpreter such as python3.12.\" >&2
+        fi
+        echo \"Requested Python '\$requested_python' was not found as a usable system interpreter on $REMOTE_HOST.\" >&2
+        exit 1
+    fi
 fi
 
-python -m pip install -r requirements.txt
-python scripts/preflight.py --profile $profile$preflight_args
+if [[ -z \"\$resolved_python\" ]] || [[ -z \"\$resolved_python_path\" ]]; then
+    echo \"No supported system Python was found on $REMOTE_HOST.\" >&2
+    echo \"Set VETQWEN_REMOTE_PYTHON explicitly, or install python3.11/python3.12 on the workstation.\" >&2
+    exit 1
+fi
+
+echo \"Using remote Python interpreter: \$resolved_python (\$resolved_python_path)\"
+uv sync --group $dependency_group --locked --python \"\$resolved_python\" --no-managed-python
+uv run --no-sync --group $dependency_group --python \"\$resolved_python\" python scripts/preflight.py --profile $profile$preflight_args
 '"
 }
 
@@ -117,8 +171,48 @@ remote_run_python_script() {
     ssh "$REMOTE_HOST" "bash -lc '
 set -euo pipefail
 cd $REMOTE_DIR
-source .venv/bin/activate
-python $script_path$remote_args
+
+requested_python=$REMOTE_PYTHON
+resolved_python=\"\"
+
+resolve_system_python() {
+    local candidate=\"\$1\"
+    local candidate_path=\"\"
+    local candidate_realpath=\"\"
+
+    candidate_path=\"\$(command -v \"\$candidate\" 2>/dev/null || true)\"
+    if [[ -z \"\$candidate_path\" ]]; then
+        return 1
+    fi
+
+    if ! \"\$candidate_path\" --version >/dev/null 2>&1; then
+        return 1
+    fi
+
+    candidate_realpath=\"\$(readlink -f \"\$candidate_path\" 2>/dev/null || printf '%s' \"\$candidate_path\")\"
+    if [[ \"\$candidate_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
+        return 1
+    fi
+
+    resolved_python=\"\$candidate\"
+    return 0
+}
+
+if [[ \"\$requested_python\" == \"auto\" ]]; then
+    for candidate in python3.11 python3.12 python3; do
+        if resolve_system_python \"\$candidate\"; then
+            break
+        fi
+    done
+else
+    resolve_system_python \"\$requested_python\" || true
+fi
+
+if [[ -n \"\$resolved_python\" ]]; then
+    uv run --no-sync --group research --python \"\$resolved_python\" python $script_path$remote_args
+else
+    uv run --no-sync --group research python $script_path$remote_args
+fi
 '"
 }
 
@@ -127,7 +221,50 @@ remote_run_shell() {
     ssh "$REMOTE_HOST" "bash -lc '
 set -euo pipefail
 cd $REMOTE_DIR
-source .venv/bin/activate
+
+requested_python=$REMOTE_PYTHON
+resolved_python=\"\"
+
+resolve_system_python() {
+    local candidate=\"\$1\"
+    local candidate_path=\"\"
+    local candidate_realpath=\"\"
+
+    candidate_path=\"\$(command -v \"\$candidate\" 2>/dev/null || true)\"
+    if [[ -z \"\$candidate_path\" ]]; then
+        return 1
+    fi
+
+    if ! \"\$candidate_path\" --version >/dev/null 2>&1; then
+        return 1
+    fi
+
+    candidate_realpath=\"\$(readlink -f \"\$candidate_path\" 2>/dev/null || printf '%s' \"\$candidate_path\")\"
+    if [[ \"\$candidate_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
+        return 1
+    fi
+
+    resolved_python=\"\$candidate\"
+    return 0
+}
+
+if [[ \"\$requested_python\" == \"auto\" ]]; then
+    for candidate in python3.11 python3.12 python3; do
+        if resolve_system_python \"\$candidate\"; then
+            break
+        fi
+    done
+else
+    resolve_system_python \"\$requested_python\" || true
+fi
+
+if [[ -z \"\$resolved_python\" ]]; then
+    echo \"No supported system Python was found on $REMOTE_HOST.\" >&2
+    echo \"Set VETQWEN_REMOTE_PYTHON explicitly, or install python3.11/python3.12 on the workstation.\" >&2
+    exit 1
+fi
+
+export VETQWEN_REMOTE_RESOLVED_PYTHON=\"\$resolved_python\"
 $command
 '"
 }

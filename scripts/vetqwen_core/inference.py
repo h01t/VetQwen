@@ -57,7 +57,8 @@ def load_inference_model(
     except ImportError as exc:
         raise SystemExit(
             "Missing dependency: torch.\n"
-            "Install torch first for local/demo inference."
+            "Sync the project environment first, for example:\n"
+            "  uv sync --group demo --locked --python 3.11 --no-managed-python"
         ) from exc
 
     try:
@@ -65,15 +66,15 @@ def load_inference_model(
     except ImportError as exc:
         raise SystemExit(
             "Missing dependency: transformers.\n"
-            "Install the required dependencies for inference."
+            "Sync the required dependencies with uv first."
         ) from exc
 
     if resolved_device == "cuda":
         if importlib.util.find_spec("accelerate") is None:
             message = (
                 "Missing dependency: accelerate.\n"
-                "Install the remote research dependencies with:\n"
-                "  pip install -r requirements.txt"
+                "Sync the remote research dependencies with:\n"
+                "  uv sync --group research --locked --python 3.11 --no-managed-python"
             )
             if remote_hint:
                 message += f"\n{remote_hint}"

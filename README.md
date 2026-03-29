@@ -21,6 +21,7 @@ VetQwen is a QLoRA fine-tune of `Qwen/Qwen2.5-3B-Instruct` for structured veteri
 | Species scope | Dog, Cat, Cattle, Pig, Sheep |
 | Synthetic data | Ollama + `qwen2.5:7b` |
 | Judge model | Ollama, typically `qwen2.5:3b-instruct` or `qwen2.5:7b` |
+| Canonical dependency manager | `uv` |
 
 ## Output Format
 
@@ -44,6 +45,9 @@ VetQwen is a QLoRA fine-tune of `Qwen/Qwen2.5-3B-Instruct` for structured veteri
 
 ```text
 vetqwen/
+├── .python-version
+├── pyproject.toml
+├── uv.lock
 ├── app/
 │   └── gradio_demo.py
 ├── configs/
@@ -72,8 +76,8 @@ vetqwen/
 │   ├── evaluate_remote.sh
 │   ├── run_judge_remote.sh
 │   └── compare_remote.sh
-├── requirements.txt           # Full remote research stack
-├── requirements-demo.txt      # Local Mac demo stack
+├── requirements.txt           # Compatibility export, not source of truth
+├── requirements-demo.txt      # Compatibility export, not source of truth
 └── README.md
 ```
 
@@ -107,14 +111,19 @@ All remote wrappers start on the Mac, run the heavy work on `blackbox`, and pull
 
 ### Local Mac
 
-- Python 3.11 recommended
+- `uv` installed and on `PATH`
+- Python 3.11 available locally
 - SSH access to `blackbox`
 - `rsync`
 
 ### Remote Workstation (`blackbox`)
 
 - Linux + NVIDIA GPU + CUDA drivers
-- Python 3.11 available as `python3.11` or overridden via `VETQWEN_REMOTE_PYTHON`
+- `uv` installed and on `PATH`
+- A supported system Python on `PATH`
+  - The wrappers auto-detect `python3.11`, then `python3.12`, then `python3`
+  - uv-managed Python shims are skipped because the wrappers use `--no-managed-python`
+  - Override explicitly with `VETQWEN_REMOTE_PYTHON` if needed
 - Ollama running for synthetic generation and judge scoring
 
 Optional SSH config:
@@ -127,19 +136,17 @@ Host blackbox
 
 ## Local Demo on Mac
 
-### 1. Install demo-only dependencies
+### 1. Sync the demo environment
 
 ```bash
-python3.11 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements-demo.txt
-python scripts/preflight.py --profile demo --skip-ollama
+uv sync --group demo --locked --python 3.11 --no-managed-python
+uv run --no-sync --group demo python scripts/preflight.py --profile demo --skip-ollama
 ```
 
 ### 2. Launch the demo
 
 ```bash
-python app/gradio_demo.py --device auto --adapter ./adapter
+uv run --no-sync --group demo python app/gradio_demo.py --device auto --adapter ./adapter
 ```
 
 Notes:
@@ -155,18 +162,16 @@ The wrappers below are the canonical workflow.
 Shared environment overrides:
 
 - `VETQWEN_REMOTE_HOST` default: `blackbox`
-- `VETQWEN_REMOTE_DIR` default: `~/vetqwen`
-- `VETQWEN_REMOTE_PYTHON` default: `python3.11`
-- `VETQWEN_REMOTE_TORCH_VERSION` default: `2.4.1`
-- `VETQWEN_REMOTE_TORCH_INDEX_URL` default: `https://download.pytorch.org/whl/cu121`
+- `VETQWEN_REMOTE_DIR` default: `~/Dev/vetqwen`
+- `VETQWEN_REMOTE_PYTHON` default: `auto`
 - `VETQWEN_REMOTE_OLLAMA_URL` default: `http://127.0.0.1:11434`
 - `VETQWEN_REMOTE_JUDGE_MODEL` optional
 
 Important behavior:
 
 - The remote project directory is created automatically if it does not exist.
-- The remote venv is bootstrapped automatically.
-- `requirements.txt` is installed remotely by the wrappers.
+- The remote wrappers auto-resolve a supported system Python, then run `uv sync --group research --locked --python "<resolved-python>" --no-managed-python`.
+- The committed `uv.lock` is the canonical environment definition for both Mac and blackbox.
 - Artifacts are pulled back automatically at the end of each wrapper run.
 
 ### Synthetic generation
@@ -199,8 +204,8 @@ VETQWEN_REMOTE_HOST=blackbox ./scripts/checks_remote.sh
 
 This runs:
 
-- `python -m py_compile`
-- `python -m unittest discover -s tests -v`
+- `uv run --no-sync --group research python -m py_compile ...`
+- `uv run --no-sync --group research python -m unittest discover -s tests -v`
 - `--help` smoke checks for the Python entrypoints
 - `bash -n scripts/*.sh`
 
@@ -392,7 +397,7 @@ If a gate fails, generate a manual review subset from the predictions and inspec
 Use this after evaluation if you want a stable urgent-plus-labeled review slice:
 
 ```bash
-python scripts/build_review_subset.py \
+uv run --no-sync --group research python scripts/build_review_subset.py \
   --input results/vetqwen_r16_clean_v2_predictions.jsonl \
   --output data/review/vetqwen_r16_clean_v2_review.jsonl \
   --target-size 40 \
@@ -406,13 +411,13 @@ python scripts/build_review_subset.py \
 Remote research stack:
 
 ```bash
-python scripts/preflight.py --profile remote
+uv run --no-sync --group research python scripts/preflight.py --profile remote
 ```
 
 Local demo stack:
 
 ```bash
-python scripts/preflight.py --profile demo --skip-ollama
+uv run --no-sync --group demo python scripts/preflight.py --profile demo --skip-ollama
 ```
 
 Behavior:
@@ -422,19 +427,31 @@ Behavior:
 
 ## Advanced: Directly on Blackbox
 
-The Python entrypoints still work directly on the workstation if you are already logged into `blackbox` and have activated the venv:
+The Python entrypoints still work directly on the workstation if you are already logged into `blackbox`:
 
 ```bash
-source .venv/bin/activate
-python scripts/generate_synthetic.py --n 100 --output data/raw/synthetic.jsonl
-python scripts/build_dataset.py --synthetic data/raw/synthetic.jsonl
-python scripts/train.py --config configs/train_default.yaml
-python scripts/evaluate.py --model ./adapter --base-model Qwen/Qwen2.5-3B-Instruct --split test --run-name local_eval --no-judge
-python scripts/run_judge.py --predictions results/local_eval_predictions.jsonl --run-name local_eval
-python scripts/compare_results.py --baseline results/baseline.json --candidate results/candidate.json
+uv sync --group research --locked --python 3.11 --no-managed-python
+uv run --no-sync --group research python scripts/generate_synthetic.py --n 100 --output data/raw/synthetic.jsonl
+uv run --no-sync --group research python scripts/build_dataset.py --synthetic data/raw/synthetic.jsonl
+uv run --no-sync --group research python scripts/train.py --config configs/train_default.yaml
+uv run --no-sync --group research python scripts/evaluate.py --model ./adapter --base-model Qwen/Qwen2.5-3B-Instruct --split test --run-name local_eval --no-judge
+uv run --no-sync --group research python scripts/run_judge.py --predictions results/local_eval_predictions.jsonl --run-name local_eval
+uv run --no-sync --group research python scripts/compare_results.py --baseline results/baseline.json --candidate results/candidate.json
 ```
 
 The wrappers remain the recommended path for normal use.
+
+## Compatibility Exports
+
+The repo still includes:
+
+- `requirements.txt`
+- `requirements-demo.txt`
+
+They are compatibility exports only for a transition period. The canonical dependency source is:
+
+- `pyproject.toml`
+- `uv.lock`
 
 ## Pinned Versions
 
@@ -442,9 +459,9 @@ The intended remote research stack is pinned around:
 
 | Package | Version |
 |---|---|
-| `torch` | `2.4.1+cu121` |
+| `torch` | `2.4.1` on macOS, `2.4.1+cu121` on Linux |
 | `transformers` | `4.44.2` |
-| `bitsandbytes` | `0.43.3` |
+| `bitsandbytes` | `0.43.3` on Linux |
 | `accelerate` | `0.33.0` |
 | `peft` | `0.12.0` |
 | `trl` | `0.9.6` |

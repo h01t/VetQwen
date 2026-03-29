@@ -1,5 +1,7 @@
-# VetQwen demo-only dependencies for local Mac usage
-# Use this when you only need the Gradio demo and pulled adapter artifacts.
+# Compatibility export only.
+# Canonical dependency source: pyproject.toml + uv.lock
+# For normal use, prefer:
+#   uv sync --group demo --locked --python 3.11 --no-managed-python
 transformers==4.44.2
 peft==0.12.0
 accelerate==0.33.0

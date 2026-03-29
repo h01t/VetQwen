@@ -33,7 +33,6 @@ REMOTE_PACKAGE_CHECKS = [
     ("sentence_transformers", "sentence-transformers", False),
     ("rouge_score", "rouge-score", False),
     ("bert_score", "bert-score", False),
-    ("gradio", "gradio", False),
     ("tensorboard", "tensorboard", False),
 ]
 

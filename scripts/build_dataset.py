@@ -365,12 +365,10 @@ def load_hf_dataset(repo_id: str) -> list[dict]:
     except ImportError as exc:
         raise SystemExit(
             "Missing dependency: 'datasets'.\n"
-            "Install the local data-prep dependencies first, for example:\n"
-            "  python -m pip install \"datasets>=2.20.0\"\n"
-            "Optional but recommended for deduplication:\n"
-            "  python -m pip install \"sentence-transformers>=3.0.0\"\n"
-            "You can also run:\n"
-            "  python scripts/preflight.py --skip-ollama"
+            "Sync the research environment first, for example:\n"
+            "  uv sync --group research --locked --python 3.11 --no-managed-python\n"
+            "Then verify the environment with:\n"
+            "  uv run --no-sync --group research python scripts/preflight.py --profile remote --skip-ollama"
         ) from exc
 
     log.info("Downloading %s ...", repo_id)

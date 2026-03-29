@@ -20,13 +20,12 @@ Defaults:
   - Otherwise uses Qwen/Qwen2.5-3B-Instruct
   - Defaults to --split test
   - Defaults to --no-judge unless judge-related flags are passed
+  - Requires uv to be installed on the remote host
 
 Environment overrides:
   VETQWEN_REMOTE_HOST
   VETQWEN_REMOTE_DIR
   VETQWEN_REMOTE_PYTHON
-  VETQWEN_REMOTE_TORCH_VERSION
-  VETQWEN_REMOTE_TORCH_INDEX_URL
   VETQWEN_REMOTE_OLLAMA_URL
   VETQWEN_REMOTE_JUDGE_MODEL
 EOF

@@ -35,13 +35,12 @@ Defaults:
   - Derives --run-name from the predictions filename when omitted
   - Uses the remote Ollama URL unless overridden
   - Uses scripts/run_judge.py default judge model unless VETQWEN_REMOTE_JUDGE_MODEL is set
+  - Requires uv to be installed on the remote host
 
 Environment overrides:
   VETQWEN_REMOTE_HOST
   VETQWEN_REMOTE_DIR
   VETQWEN_REMOTE_PYTHON
-  VETQWEN_REMOTE_TORCH_VERSION
-  VETQWEN_REMOTE_TORCH_INDEX_URL
   VETQWEN_REMOTE_OLLAMA_URL
   VETQWEN_REMOTE_JUDGE_MODEL
 EOF

@@ -18,13 +18,13 @@ Runs:
 
 Usage:
   ./scripts/checks_remote.sh
+  ./scripts/checks_remote.sh --with-ollama
+  Requires uv to be installed on the remote host.
 
 Environment overrides:
   VETQWEN_REMOTE_HOST
   VETQWEN_REMOTE_DIR
   VETQWEN_REMOTE_PYTHON
-  VETQWEN_REMOTE_TORCH_VERSION
-  VETQWEN_REMOTE_TORCH_INDEX_URL
 EOF
     exit 0
 fi
@@ -37,22 +37,27 @@ remote_sync_project \
     --exclude 'results' \
     --exclude 'data/raw' \
     --exclude 'data/processed'
-remote_bootstrap_env remote --skip-ollama
+
+preflight_args=(remote --skip-ollama)
+if has_arg "--with-ollama" "$@"; then
+    preflight_args=(remote)
+fi
+remote_bootstrap_env "${preflight_args[@]}"
 
 echo ""
 echo "=== Running checks on $REMOTE_HOST ==="
 remote_run_shell "
-python -m py_compile scripts/*.py tests/*.py app/*.py
-python -m unittest discover -s tests -v
-python scripts/build_dataset.py --help >/dev/null
-python scripts/generate_synthetic.py --help >/dev/null
-python scripts/train.py --help >/dev/null
-python scripts/evaluate.py --help >/dev/null
-python scripts/run_judge.py --help >/dev/null
-python scripts/preflight.py --help >/dev/null
-python scripts/build_review_subset.py --help >/dev/null
-python scripts/compare_results.py --help >/dev/null
-python app/gradio_demo.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python -m py_compile scripts/*.py tests/*.py app/*.py
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python -m unittest discover -s tests -v
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/build_dataset.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/generate_synthetic.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/train.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/evaluate.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/run_judge.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/preflight.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/build_review_subset.py --help >/dev/null
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python scripts/compare_results.py --help >/dev/null
+uv run --no-sync --group demo --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python app/gradio_demo.py --help >/dev/null
 bash -n scripts/*.sh
 "
 

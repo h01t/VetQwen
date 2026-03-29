@@ -18,13 +18,12 @@ Usage:
 Defaults:
   - Uses --output data/raw/synthetic.jsonl when omitted
   - Uses the remote Ollama URL from VETQWEN_REMOTE_OLLAMA_URL unless overridden
+  - Requires uv to be installed on the remote host
 
 Environment overrides:
   VETQWEN_REMOTE_HOST
   VETQWEN_REMOTE_DIR
   VETQWEN_REMOTE_PYTHON
-  VETQWEN_REMOTE_TORCH_VERSION
-  VETQWEN_REMOTE_TORCH_INDEX_URL
   VETQWEN_REMOTE_OLLAMA_URL
 EOF
     exit 0
