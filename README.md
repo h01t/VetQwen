@@ -170,7 +170,7 @@ Shared environment overrides:
 Important behavior:
 
 - The remote project directory is created automatically if it does not exist.
-- The remote wrappers auto-resolve a supported system Python, then run `uv sync --group research --locked --python "<resolved-python>" `.
+- The remote wrappers use a pinned uv-managed runtime (default `VETQWEN_REMOTE_PYTHON=3.11`) and run `uv sync --group research --locked --python "$VETQWEN_REMOTE_PYTHON"`.
 - The committed `uv.lock` is the canonical environment definition for both Mac and blackbox.
 - Artifacts are pulled back automatically at the end of each wrapper run.
 

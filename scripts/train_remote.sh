@@ -43,6 +43,22 @@ remote_sync_project \
 remote_bootstrap_env remote --skip-ollama
 
 echo ""
+echo "=== Verifying CUDA on $REMOTE_HOST ==="
+remote_run_shell "
+uv run --no-sync --group research --python \"\$VETQWEN_REMOTE_RESOLVED_PYTHON\" python - <<'PY'
+import torch
+
+if not torch.cuda.is_available():
+    raise SystemExit(\"CUDA not available\")
+
+device_count = torch.cuda.device_count()
+device_0 = torch.cuda.get_device_name(0) if device_count else \"none\"
+print(f\"cuda_available={torch.cuda.is_available()} device_count={device_count} device_0={device_0}\")
+PY
+nvidia-smi
+"
+
+echo ""
 echo "=== Starting training on $REMOTE_HOST ==="
 remote_run_python_script "scripts/train.py" "${train_args[@]}"
 

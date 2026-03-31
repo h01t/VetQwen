@@ -16,8 +16,8 @@ SUPPORTED_PYTHON_MAX = (3, 12)
 
 def resolve_device(device: str) -> str:
   requested = device.casefold()
-  if requested not in {"auto", "cpu", "cuda"}:
-    raise ValueError(f"Unsupported device '{device}'. Use auto, cpu, or cuda.")
+  if requested not in {"auto", "cpu", "cuda", "mps"}:
+    raise ValueError(f"Unsupported device '{device}'. Use auto, cpu, cuda, or mps.")
 
   if requested == "cpu":
     return "cpu"
@@ -28,7 +28,23 @@ def resolve_device(device: str) -> str:
     import torch
   except ImportError:
     return "cpu"
-  return "cuda" if torch.cuda.is_available() else "cpu"
+
+  if requested == "mps":
+    mps_backend = getattr(torch.backends, "mps", None)
+    if mps_backend is None or not mps_backend.is_available():
+      raise ValueError(
+        "Requested device 'mps' but MPS is not available in this environment."
+      )
+    return "mps"
+
+  if torch.cuda.is_available():
+    return "cuda"
+
+  mps_backend = getattr(torch.backends, "mps", None)
+  if mps_backend is not None and mps_backend.is_available():
+    return "mps"
+
+  return "cpu"
 
 
 def load_inference_model(
@@ -101,9 +117,10 @@ def load_inference_model(
       "trust_remote_code": True,
     }
   else:
+    dtype = torch.float16 if resolved_device == "mps" else torch.float32
     model_kwargs = {
       "trust_remote_code": True,
-      "torch_dtype": torch.float32,
+      "torch_dtype": dtype,
     }
 
   if is_local_adapter:

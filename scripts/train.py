@@ -40,6 +40,20 @@ def load_model_and_tokenizer(cfg: dict):
     import torch
     from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig  # type: ignore
 
+    if not torch.cuda.is_available():
+        raise RuntimeError(
+            "CUDA is required for remote QLoRA training but no CUDA device is available."
+        )
+
+    cuda_device_count = torch.cuda.device_count()
+    cuda_device_name = torch.cuda.get_device_name(0) if cuda_device_count > 0 else "unknown"
+    log.info(
+        "CUDA available: %s | device_count=%s | primary_device=%s",
+        torch.cuda.is_available(),
+        cuda_device_count,
+        cuda_device_name,
+    )
+
     model_name = cfg["model"]["name"]
     q_cfg = cfg["quantization"]
 

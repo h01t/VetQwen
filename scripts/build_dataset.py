@@ -372,7 +372,7 @@ def load_hf_dataset(repo_id: str) -> list[dict]:
     ) from exc
 
   log.info("Downloading %s ...", repo_id)
-  dataset = load_dataset(repo_id, trust_remote_code=True)
+  dataset = load_dataset(repo_id)
 
   records: list[dict] = []
   for split_name, split_ds in dataset.items():

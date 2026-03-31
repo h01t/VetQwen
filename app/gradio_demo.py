@@ -287,8 +287,8 @@ def main() -> None:
         "--device",
         type=str,
         default="auto",
-        choices=["auto", "cpu", "cuda"],
-        help="Inference device to use (default: auto)",
+        choices=["auto", "cpu", "cuda", "mps"],
+        help="Inference device to use (default: auto). On MacBook Apple Silicon, use --device mps or --device auto.",
     )
     args = parser.parse_args()
 
