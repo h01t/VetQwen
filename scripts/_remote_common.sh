@@ -5,7 +5,7 @@ PROJECT_ROOT="$(cd -- "$REMOTE_COMMON_DIR/.." && pwd)"
 
 REMOTE_HOST="${VETQWEN_REMOTE_HOST:-blackbox}"
 REMOTE_DIR="${VETQWEN_REMOTE_DIR:-~/Dev/vetqwen}"
-REMOTE_PYTHON="${VETQWEN_REMOTE_PYTHON:-auto}"
+REMOTE_PYTHON="${VETQWEN_REMOTE_PYTHON:-3.11}"
 REMOTE_OLLAMA_URL="${VETQWEN_REMOTE_OLLAMA_URL:-http://127.0.0.1:11434}"
 REMOTE_JUDGE_MODEL="${VETQWEN_REMOTE_JUDGE_MODEL:-}"
 DEFAULT_BASE_MODEL="Qwen/Qwen2.5-3B-Instruct"
@@ -55,17 +55,19 @@ remote_print_context() {
     echo "=== $title ==="
     echo "Remote host: $REMOTE_HOST"
     echo "Remote dir:  $REMOTE_DIR"
-    if [[ "$REMOTE_PYTHON" == "auto" ]]; then
-        echo "Python:      auto (prefers python3.11, then python3.12, then python3)"
-    else
-        echo "Python:      $REMOTE_PYTHON"
-    fi
+    echo "Python:      $REMOTE_PYTHON (uv-managed allowed)"
+}
+
+remote_shell_quote() {
+    printf '%q' "$1"
 }
 
 remote_ensure_project_dir() {
     echo ""
     echo "=== Ensuring remote project directory exists ==="
-    ssh "$REMOTE_HOST" "mkdir -p $REMOTE_DIR"
+    local remote_dir_quoted
+    remote_dir_quoted="$(remote_shell_quote "$REMOTE_DIR")"
+    ssh "$REMOTE_HOST" "mkdir -p $remote_dir_quoted"
 }
 
 remote_sync_project() {
@@ -91,75 +93,30 @@ remote_bootstrap_env() {
     if [[ "$profile" == "demo" ]]; then
         dependency_group="demo"
     fi
+    local remote_dir_quoted host_quoted py_quoted profile_quoted dep_group_quoted
+    remote_dir_quoted="$(remote_shell_quote "$REMOTE_DIR")"
+    host_quoted="$REMOTE_HOST"
+    py_quoted="$REMOTE_PYTHON"
+    profile_quoted="$profile"
+    dep_group_quoted="$dependency_group"
 
     echo ""
     echo "=== Bootstrapping remote environment ==="
     ssh "$REMOTE_HOST" "bash -lc '
 set -euo pipefail
-cd $REMOTE_DIR
+cd $remote_dir_quoted
 
 if ! command -v uv >/dev/null 2>&1; then
-    echo \"uv is required on $REMOTE_HOST but was not found on PATH.\" >&2
+    echo \"uv is required on $host_quoted but was not found on PATH.\" >&2
     echo \"Install uv on the workstation first, then rerun this wrapper.\" >&2
     exit 1
 fi
 
-requested_python=$REMOTE_PYTHON
-resolved_python=\"\"
-resolved_python_path=\"\"
+requested_python=\"$py_quoted\"
 
-resolve_system_python() {
-    local candidate=\"\$1\"
-    local candidate_path=\"\"
-    local candidate_realpath=\"\"
-
-    candidate_path=\"\$(command -v \"\$candidate\" 2>/dev/null || true)\"
-    if [[ -z \"\$candidate_path\" ]]; then
-        return 1
-    fi
-
-    if ! \"\$candidate_path\" --version >/dev/null 2>&1; then
-        return 1
-    fi
-
-    candidate_realpath=\"\$(readlink -f \"\$candidate_path\" 2>/dev/null || printf '%s' \"\$candidate_path\")\"
-    if [[ \"\$candidate_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
-        return 1
-    fi
-
-    resolved_python=\"\$candidate\"
-    resolved_python_path=\"\$candidate_realpath\"
-    return 0
-}
-
-if [[ \"\$requested_python\" == \"auto\" ]]; then
-    for candidate in python3.11 python3.12 python3; do
-        if resolve_system_python \"\$candidate\"; then
-            break
-        fi
-    done
-else
-    if ! resolve_system_python \"\$requested_python\"; then
-        requested_path=\"\$(command -v \"\$requested_python\" 2>/dev/null || true)\"
-        requested_realpath=\"\$(readlink -f \"\$requested_path\" 2>/dev/null || printf '%s' \"\$requested_path\")\"
-        if [[ -n \"\$requested_realpath\" && \"\$requested_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
-            echo \"Requested Python '\$requested_python' resolves to a uv-managed interpreter, which is excluded by --no-managed-python.\" >&2
-            echo \"Set VETQWEN_REMOTE_PYTHON to a system interpreter such as python3.12.\" >&2
-        fi
-        echo \"Requested Python '\$requested_python' was not found as a usable system interpreter on $REMOTE_HOST.\" >&2
-        exit 1
-    fi
-fi
-
-if [[ -z \"\$resolved_python\" ]] || [[ -z \"\$resolved_python_path\" ]]; then
-    echo \"No supported system Python was found on $REMOTE_HOST.\" >&2
-    echo \"Set VETQWEN_REMOTE_PYTHON explicitly, or install python3.11/python3.12 on the workstation.\" >&2
-    exit 1
-fi
-
-echo \"Using remote Python interpreter: \$resolved_python (\$resolved_python_path)\"
-uv sync --group $dependency_group --locked --python \"\$resolved_python\" --no-managed-python
-uv run --no-sync --group $dependency_group --python \"\$resolved_python\" python scripts/preflight.py --profile $profile$preflight_args
+echo "Syncing uv environment with Python: \$requested_python"
+uv sync --group $dep_group_quoted --locked --python "\$requested_python"
+uv run --no-sync --group $dep_group_quoted --python "\$requested_python" python scripts/preflight.py --profile $profile_quoted$preflight_args
 '"
 }
 
@@ -168,103 +125,28 @@ remote_run_python_script() {
     shift
     local remote_args
     remote_args="$(quote_args "$@")"
+    local remote_dir_quoted py_quoted script_quoted
+    remote_dir_quoted="$(remote_shell_quote "$REMOTE_DIR")"
+    py_quoted="$(remote_shell_quote "$REMOTE_PYTHON")"
+    script_quoted="$(remote_shell_quote "$script_path")"
+
     ssh "$REMOTE_HOST" "bash -lc '
 set -euo pipefail
-cd $REMOTE_DIR
-
-requested_python=$REMOTE_PYTHON
-resolved_python=\"\"
-
-resolve_system_python() {
-    local candidate=\"\$1\"
-    local candidate_path=\"\"
-    local candidate_realpath=\"\"
-
-    candidate_path=\"\$(command -v \"\$candidate\" 2>/dev/null || true)\"
-    if [[ -z \"\$candidate_path\" ]]; then
-        return 1
-    fi
-
-    if ! \"\$candidate_path\" --version >/dev/null 2>&1; then
-        return 1
-    fi
-
-    candidate_realpath=\"\$(readlink -f \"\$candidate_path\" 2>/dev/null || printf '%s' \"\$candidate_path\")\"
-    if [[ \"\$candidate_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
-        return 1
-    fi
-
-    resolved_python=\"\$candidate\"
-    return 0
-}
-
-if [[ \"\$requested_python\" == \"auto\" ]]; then
-    for candidate in python3.11 python3.12 python3; do
-        if resolve_system_python \"\$candidate\"; then
-            break
-        fi
-    done
-else
-    resolve_system_python \"\$requested_python\" || true
-fi
-
-if [[ -n \"\$resolved_python\" ]]; then
-    uv run --no-sync --group research --python \"\$resolved_python\" python $script_path$remote_args
-else
-    uv run --no-sync --group research python $script_path$remote_args
-fi
+cd $remote_dir_quoted
+requested_python=$py_quoted
+uv run --no-sync --group research --python \"\$requested_python\" python $script_quoted$remote_args
 '"
 }
 
 remote_run_shell() {
     local command="$1"
+    local remote_dir_quoted py_quoted
+    remote_dir_quoted="$(remote_shell_quote "$REMOTE_DIR")"
+    py_quoted="$(remote_shell_quote "$REMOTE_PYTHON")"
     ssh "$REMOTE_HOST" "bash -lc '
 set -euo pipefail
-cd $REMOTE_DIR
-
-requested_python=$REMOTE_PYTHON
-resolved_python=\"\"
-
-resolve_system_python() {
-    local candidate=\"\$1\"
-    local candidate_path=\"\"
-    local candidate_realpath=\"\"
-
-    candidate_path=\"\$(command -v \"\$candidate\" 2>/dev/null || true)\"
-    if [[ -z \"\$candidate_path\" ]]; then
-        return 1
-    fi
-
-    if ! \"\$candidate_path\" --version >/dev/null 2>&1; then
-        return 1
-    fi
-
-    candidate_realpath=\"\$(readlink -f \"\$candidate_path\" 2>/dev/null || printf '%s' \"\$candidate_path\")\"
-    if [[ \"\$candidate_realpath\" == \"\$HOME/.local/share/uv/python/\"* ]]; then
-        return 1
-    fi
-
-    resolved_python=\"\$candidate\"
-    return 0
-}
-
-if [[ \"\$requested_python\" == \"auto\" ]]; then
-    for candidate in python3.11 python3.12 python3; do
-        if resolve_system_python \"\$candidate\"; then
-            break
-        fi
-    done
-else
-    resolve_system_python \"\$requested_python\" || true
-fi
-
-if [[ -z \"\$resolved_python\" ]]; then
-    echo \"No supported system Python was found on $REMOTE_HOST.\" >&2
-    echo \"Set VETQWEN_REMOTE_PYTHON explicitly, or install python3.11/python3.12 on the workstation.\" >&2
-    exit 1
-fi
-
-export VETQWEN_REMOTE_RESOLVED_PYTHON=\"\$resolved_python\"
+cd $remote_dir_quoted
+export VETQWEN_REMOTE_RESOLVED_PYTHON=$py_quoted
 $command
 '"
 }

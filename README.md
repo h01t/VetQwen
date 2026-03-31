@@ -49,35 +49,35 @@ vetqwen/
 ├── pyproject.toml
 ├── uv.lock
 ├── app/
-│   └── gradio_demo.py
+│  └── gradio_demo.py
 ├── configs/
-│   └── train_default.yaml
+│  └── train_default.yaml
 ├── data/
-│   ├── raw/                   # Synthetic/raw inputs (git-ignored)
-│   ├── processed/             # Built train/val/test JSONL splits (git-ignored)
-│   ├── review/                # Generated manual-review exports (git-ignored)
-│   └── dataset_card.md
-├── results/                   # Metrics, predictions, comparison summaries (git-ignored)
+│  ├── raw/          # Synthetic/raw inputs (git-ignored)
+│  ├── processed/       # Built train/val/test JSONL splits (git-ignored)
+│  ├── review/        # Generated manual-review exports (git-ignored)
+│  └── dataset_card.md
+├── results/          # Metrics, predictions, comparison summaries (git-ignored)
 ├── scripts/
-│   ├── vetqwen_core/          # Shared internal helpers
-│   ├── _remote_common.sh
-│   ├── generate_synthetic.py
-│   ├── build_dataset.py
-│   ├── train.py
-│   ├── evaluate.py
-│   ├── run_judge.py
-│   ├── compare_results.py
-│   ├── build_review_subset.py
-│   ├── preflight.py
-│   ├── generate_synthetic_remote.sh
-│   ├── build_dataset_remote.sh
-│   ├── checks_remote.sh
-│   ├── train_remote.sh
-│   ├── evaluate_remote.sh
-│   ├── run_judge_remote.sh
-│   └── compare_remote.sh
-├── requirements.txt           # Compatibility export, not source of truth
-├── requirements-demo.txt      # Compatibility export, not source of truth
+│  ├── vetqwen_core/     # Shared internal helpers
+│  ├── _remote_common.sh
+│  ├── generate_synthetic.py
+│  ├── build_dataset.py
+│  ├── train.py
+│  ├── evaluate.py
+│  ├── run_judge.py
+│  ├── compare_results.py
+│  ├── build_review_subset.py
+│  ├── preflight.py
+│  ├── generate_synthetic_remote.sh
+│  ├── build_dataset_remote.sh
+│  ├── checks_remote.sh
+│  ├── train_remote.sh
+│  ├── evaluate_remote.sh
+│  ├── run_judge_remote.sh
+│  └── compare_remote.sh
+├── requirements.txt      # Compatibility export, not source of truth
+├── requirements-demo.txt   # Compatibility export, not source of truth
 └── README.md
 ```
 
@@ -120,18 +120,18 @@ All remote wrappers start on the Mac, run the heavy work on `blackbox`, and pull
 
 - Linux + NVIDIA GPU + CUDA drivers
 - `uv` installed and on `PATH`
-- A supported system Python on `PATH`
-  - The wrappers auto-detect `python3.11`, then `python3.12`, then `python3`
-  - uv-managed Python shims are skipped because the wrappers use `--no-managed-python`
-  - Override explicitly with `VETQWEN_REMOTE_PYTHON` if needed
+- Python available on `PATH` (uv-managed or system)
+ - The wrappers auto-detect `python3.11`, then `python3.12`, then `python3`
+ - uv-managed Python shims are skipped because the wrappers use ``
+ - Override explicitly with `VETQWEN_REMOTE_PYTHON` if needed
 - Ollama running for synthetic generation and judge scoring
 
 Optional SSH config:
 
 ```sshconfig
 Host blackbox
-  HostName your-host-or-ip
-  User your-username
+ HostName your-host-or-ip
+ User your-username
 ```
 
 ## Local Demo on Mac
@@ -139,7 +139,7 @@ Host blackbox
 ### 1. Sync the demo environment
 
 ```bash
-uv sync --group demo --locked --python 3.11 --no-managed-python
+uv sync --group demo --locked --python 3.11 
 uv run --no-sync --group demo python scripts/preflight.py --profile demo --skip-ollama
 ```
 
@@ -163,14 +163,14 @@ Shared environment overrides:
 
 - `VETQWEN_REMOTE_HOST` default: `blackbox`
 - `VETQWEN_REMOTE_DIR` default: `~/Dev/vetqwen`
-- `VETQWEN_REMOTE_PYTHON` default: `auto`
+- `VETQWEN_REMOTE_PYTHON` default: `3.11`
 - `VETQWEN_REMOTE_OLLAMA_URL` default: `http://127.0.0.1:11434`
 - `VETQWEN_REMOTE_JUDGE_MODEL` optional
 
 Important behavior:
 
 - The remote project directory is created automatically if it does not exist.
-- The remote wrappers auto-resolve a supported system Python, then run `uv sync --group research --locked --python "<resolved-python>" --no-managed-python`.
+- The remote wrappers auto-resolve a supported system Python, then run `uv sync --group research --locked --python "<resolved-python>" `.
 - The committed `uv.lock` is the canonical environment definition for both Mac and blackbox.
 - Artifacts are pulled back automatically at the end of each wrapper run.
 
@@ -178,15 +178,15 @@ Important behavior:
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/generate_synthetic_remote.sh \
-  --n 400 \
-  --output data/raw/synthetic.jsonl
+ --n 400 \
+ --output data/raw/synthetic.jsonl
 ```
 
 ### Dataset build
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/build_dataset_remote.sh \
-  --synthetic data/raw/synthetic.jsonl
+ --synthetic data/raw/synthetic.jsonl
 ```
 
 This pulls back:
@@ -213,8 +213,8 @@ This runs:
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/train_remote.sh \
-  --config configs/train_default.yaml \
-  --run-name vetqwen_r16_clean_v2
+ --config configs/train_default.yaml \
+ --run-name vetqwen_r16_clean_v2
 ```
 
 This pulls back:
@@ -229,23 +229,23 @@ Baseline:
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/evaluate_remote.sh \
-  --model Qwen/Qwen2.5-3B-Instruct \
-  --split test \
-  --run-name baseline_3b_clean_v2 \
-  --seed 42 \
-  --no-judge
+ --model Qwen/Qwen2.5-3B-Instruct \
+ --split test \
+ --run-name baseline_3b_clean_v2 \
+ --seed 42 \
+ --no-judge
 ```
 
 Fine-tuned adapter:
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/evaluate_remote.sh \
-  --model ./adapter \
-  --base-model Qwen/Qwen2.5-3B-Instruct \
-  --split test \
-  --run-name vetqwen_r16_clean_v2 \
-  --seed 42 \
-  --no-judge
+ --model ./adapter \
+ --base-model Qwen/Qwen2.5-3B-Instruct \
+ --split test \
+ --run-name vetqwen_r16_clean_v2 \
+ --seed 42 \
+ --no-judge
 ```
 
 ### Remote judge scoring
@@ -256,10 +256,10 @@ Baseline:
 VETQWEN_REMOTE_HOST=blackbox \
 VETQWEN_REMOTE_JUDGE_MODEL=qwen2.5:3b-instruct \
 ./scripts/run_judge_remote.sh \
-  --predictions results/baseline_3b_clean_v2_predictions.jsonl \
-  --run-name baseline_3b_clean_v2 \
-  --sample 50 \
-  --seed 42
+ --predictions results/baseline_3b_clean_v2_predictions.jsonl \
+ --run-name baseline_3b_clean_v2 \
+ --sample 50 \
+ --seed 42
 ```
 
 Fine-tuned adapter:
@@ -268,21 +268,21 @@ Fine-tuned adapter:
 VETQWEN_REMOTE_HOST=blackbox \
 VETQWEN_REMOTE_JUDGE_MODEL=qwen2.5:3b-instruct \
 ./scripts/run_judge_remote.sh \
-  --predictions results/vetqwen_r16_clean_v2_predictions.jsonl \
-  --run-name vetqwen_r16_clean_v2 \
-  --sample 50 \
-  --seed 42
+ --predictions results/vetqwen_r16_clean_v2_predictions.jsonl \
+ --run-name vetqwen_r16_clean_v2 \
+ --sample 50 \
+ --seed 42
 ```
 
 ### Remote comparison pass
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/compare_remote.sh \
-  --baseline results/baseline_3b_clean_v2.json \
-  --candidate results/vetqwen_r16_clean_v2.json \
-  --baseline-judge results/baseline_3b_clean_v2_judge.json \
-  --candidate-judge results/vetqwen_r16_clean_v2_judge.json \
-  --output results/comparisons/vetqwen_r16_clean_v2_vs_baseline.md
+ --baseline results/baseline_3b_clean_v2.json \
+ --candidate results/vetqwen_r16_clean_v2.json \
+ --baseline-judge results/baseline_3b_clean_v2_judge.json \
+ --candidate-judge results/vetqwen_r16_clean_v2_judge.json \
+ --output results/comparisons/vetqwen_r16_clean_v2_vs_baseline.md
 ```
 
 This pulls back:
@@ -298,15 +298,15 @@ This is the concrete recommended sequence for the next full cycle.
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/generate_synthetic_remote.sh \
-  --n 400 \
-  --output data/raw/synthetic.jsonl
+ --n 400 \
+ --output data/raw/synthetic.jsonl
 ```
 
 ### 2. Rebuild the cleaned dataset remotely
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/build_dataset_remote.sh \
-  --synthetic data/raw/synthetic.jsonl
+ --synthetic data/raw/synthetic.jsonl
 ```
 
 ### 3. Run remote checks before training
@@ -319,31 +319,31 @@ VETQWEN_REMOTE_HOST=blackbox ./scripts/checks_remote.sh
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/train_remote.sh \
-  --config configs/train_default.yaml \
-  --run-name vetqwen_r16_clean_v2
+ --config configs/train_default.yaml \
+ --run-name vetqwen_r16_clean_v2
 ```
 
 ### 5. Run deterministic clean baseline evaluation
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/evaluate_remote.sh \
-  --model Qwen/Qwen2.5-3B-Instruct \
-  --split test \
-  --run-name baseline_3b_clean_v2 \
-  --seed 42 \
-  --no-judge
+ --model Qwen/Qwen2.5-3B-Instruct \
+ --split test \
+ --run-name baseline_3b_clean_v2 \
+ --seed 42 \
+ --no-judge
 ```
 
 ### 6. Run deterministic clean post-retrain adapter evaluation
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/evaluate_remote.sh \
-  --model ./adapter \
-  --base-model Qwen/Qwen2.5-3B-Instruct \
-  --split test \
-  --run-name vetqwen_r16_clean_v2 \
-  --seed 42 \
-  --no-judge
+ --model ./adapter \
+ --base-model Qwen/Qwen2.5-3B-Instruct \
+ --split test \
+ --run-name vetqwen_r16_clean_v2 \
+ --seed 42 \
+ --no-judge
 ```
 
 ### 7. Run clean baseline judge scoring remotely
@@ -352,10 +352,10 @@ VETQWEN_REMOTE_HOST=blackbox ./scripts/evaluate_remote.sh \
 VETQWEN_REMOTE_HOST=blackbox \
 VETQWEN_REMOTE_JUDGE_MODEL=qwen2.5:3b-instruct \
 ./scripts/run_judge_remote.sh \
-  --predictions results/baseline_3b_clean_v2_predictions.jsonl \
-  --run-name baseline_3b_clean_v2 \
-  --sample 50 \
-  --seed 42
+ --predictions results/baseline_3b_clean_v2_predictions.jsonl \
+ --run-name baseline_3b_clean_v2 \
+ --sample 50 \
+ --seed 42
 ```
 
 ### 8. Run clean post-retrain adapter judge scoring remotely
@@ -364,21 +364,21 @@ VETQWEN_REMOTE_JUDGE_MODEL=qwen2.5:3b-instruct \
 VETQWEN_REMOTE_HOST=blackbox \
 VETQWEN_REMOTE_JUDGE_MODEL=qwen2.5:3b-instruct \
 ./scripts/run_judge_remote.sh \
-  --predictions results/vetqwen_r16_clean_v2_predictions.jsonl \
-  --run-name vetqwen_r16_clean_v2 \
-  --sample 50 \
-  --seed 42
+ --predictions results/vetqwen_r16_clean_v2_predictions.jsonl \
+ --run-name vetqwen_r16_clean_v2 \
+ --sample 50 \
+ --seed 42
 ```
 
 ### 9. Run the post-retrain comparison pass remotely
 
 ```bash
 VETQWEN_REMOTE_HOST=blackbox ./scripts/compare_remote.sh \
-  --baseline results/baseline_3b_clean_v2.json \
-  --candidate results/vetqwen_r16_clean_v2.json \
-  --baseline-judge results/baseline_3b_clean_v2_judge.json \
-  --candidate-judge results/vetqwen_r16_clean_v2_judge.json \
-  --output results/comparisons/vetqwen_r16_clean_v2_vs_baseline.md
+ --baseline results/baseline_3b_clean_v2.json \
+ --candidate results/vetqwen_r16_clean_v2.json \
+ --baseline-judge results/baseline_3b_clean_v2_judge.json \
+ --candidate-judge results/vetqwen_r16_clean_v2_judge.json \
+ --output results/comparisons/vetqwen_r16_clean_v2_vs_baseline.md
 ```
 
 ### 10. Review against these acceptance gates
@@ -398,10 +398,10 @@ Use this after evaluation if you want a stable urgent-plus-labeled review slice:
 
 ```bash
 uv run --no-sync --group research python scripts/build_review_subset.py \
-  --input results/vetqwen_r16_clean_v2_predictions.jsonl \
-  --output data/review/vetqwen_r16_clean_v2_review.jsonl \
-  --target-size 40 \
-  --seed 42
+ --input results/vetqwen_r16_clean_v2_predictions.jsonl \
+ --output data/review/vetqwen_r16_clean_v2_review.jsonl \
+ --target-size 40 \
+ --seed 42
 ```
 
 `data/review/*.jsonl` is treated as generated output, not source.
@@ -430,7 +430,7 @@ Behavior:
 The Python entrypoints still work directly on the workstation if you are already logged into `blackbox`:
 
 ```bash
-uv sync --group research --locked --python 3.11 --no-managed-python
+uv sync --group research --locked --python 3.11 
 uv run --no-sync --group research python scripts/generate_synthetic.py --n 100 --output data/raw/synthetic.jsonl
 uv run --no-sync --group research python scripts/build_dataset.py --synthetic data/raw/synthetic.jsonl
 uv run --no-sync --group research python scripts/train.py --config configs/train_default.yaml
