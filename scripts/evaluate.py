@@ -45,7 +45,10 @@ logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s"
 )
 log = logging.getLogger(__name__)
+
+
 def set_random_seed(seed: int) -> None:
+    """Seed Python and Torch to keep evaluation runs reproducible."""
     random.seed(seed)
     try:
         import torch
@@ -100,15 +103,18 @@ def compute_format_compliance(predictions: list[str]) -> float:
 def compute_primary_metrics(
     rows: list[dict[str, Any]]
 ) -> dict[str, Any]:
+    """Compute task-level metrics from parsed evaluation rows."""
     parsed_predictions = [row["parsed_prediction"] for row in rows]
 
     triage_section_presence = (
-        sum(parsed["triage_present"] for parsed in parsed_predictions) / len(parsed_predictions)
+        sum(parsed["triage_present"] for parsed in parsed_predictions)
+        / len(parsed_predictions)
         if parsed_predictions
         else 0.0
     )
     parse_success_rate = (
-        sum(parsed["parse_success"] for parsed in parsed_predictions) / len(parsed_predictions)
+        sum(parsed["parse_success"] for parsed in parsed_predictions)
+        / len(parsed_predictions)
         if parsed_predictions
         else 0.0
     )
@@ -267,6 +273,7 @@ def run_llm_judge(
     sample_size: int = 100,
     seed: int = 42,
 ) -> tuple[dict[str, float], list[int]]:
+    """Score a sampled subset of predictions with the Ollama-based judge."""
     indices = select_sample_indices(len(predictions), sample_size, seed=seed)
 
     results: list[dict[str, Any]] = []
@@ -303,8 +310,9 @@ def run_llm_judge(
 
 
 def load_split_records(path: str) -> list[dict[str, Any]]:
+    """Load a JSONL split into the flat evaluation record structure."""
     records: list[dict[str, Any]] = []
-    with open(path) as handle:
+    with Path(path).open(encoding="utf-8") as handle:
         for index, line in enumerate(handle):
             line = line.strip()
             if not line:
@@ -332,6 +340,7 @@ def load_split_records(path: str) -> list[dict[str, Any]]:
 
 
 def evaluate(args: argparse.Namespace) -> None:
+    """Run the full VetQwen evaluation and persist result artifacts."""
     split_file = f"data/processed/{args.split}.jsonl"
     log.info("Loading evaluation data from %s ...", split_file)
     records = load_split_records(split_file)
@@ -412,7 +421,10 @@ def evaluate(args: argparse.Namespace) -> None:
         f"{primary_metrics['diagnosis_hit_rate']:.2%}",
         primary_metrics["n_condition_labeled"],
     )
-    log.info("Triage section presence: %s", f"{primary_metrics['triage_section_presence']:.2%}")
+    log.info(
+        "Triage section presence: %s",
+        f"{primary_metrics['triage_section_presence']:.2%}",
+    )
     log.info("Parse success rate:      %s", f"{primary_metrics['parse_success_rate']:.2%}")
     log.info("Triage accuracy:         %s", f"{primary_metrics['triage_accuracy']:.2%}")
     log.info(
@@ -484,12 +496,12 @@ def evaluate(args: argparse.Namespace) -> None:
         results["judge_sample_indices"] = judge_indices
 
     results_path = results_dir / f"{args.run_name}.json"
-    with results_path.open("w") as handle:
+    with results_path.open("w", encoding="utf-8") as handle:
         json.dump(results, handle, indent=2)
     log.info("Results saved to %s", results_path)
 
     predictions_path = results_dir / f"{args.run_name}_predictions.jsonl"
-    with predictions_path.open("w") as handle:
+    with predictions_path.open("w", encoding="utf-8") as handle:
         for record, prediction, evaluation_row in zip(records, predictions, evaluation_rows):
             handle.write(
                 json.dumps(
@@ -517,7 +529,9 @@ def evaluate(args: argparse.Namespace) -> None:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="VetQwen evaluation")
+    parser = argparse.ArgumentParser(
+        description="Run VetQwen evaluation on a dataset split."
+    )
     parser.add_argument(
         "--model",
         type=str,

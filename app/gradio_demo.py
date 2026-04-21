@@ -14,8 +14,9 @@ from __future__ import annotations
 
 import argparse
 import logging
-from pathlib import Path
 import sys
+from pathlib import Path
+from typing import Any
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS_DIR = ROOT / "scripts"
@@ -77,12 +78,17 @@ DISCLAIMER = (
 # Model loading (lazy — loaded on first inference)
 # ---------------------------------------------------------------------------
 
-_model = None
-_tokenizer = None
+_model: Any | None = None
+_tokenizer: Any | None = None
 _resolved_device = None
 
 
-def load_model(adapter_path: str, base_model: str, device: str = "auto"):
+def load_model(
+    adapter_path: str,
+    base_model: str,
+    device: str = "auto",
+) -> tuple[Any, Any]:
+    """Load the inference model once and cache it for the demo session."""
     global _model, _tokenizer, _resolved_device
 
     if _model is not None:
@@ -124,6 +130,7 @@ def diagnose(
     temperature: float,
     max_new_tokens: int,
 ) -> str:
+    """Generate a structured diagnostic response for the current form state."""
     if not complaint.strip():
         return "Please enter a presenting complaint / symptoms."
 
@@ -154,10 +161,11 @@ def diagnose(
 # ---------------------------------------------------------------------------
 
 
-def build_demo(adapter_path: str, base_model: str, device: str):
+def build_demo(adapter_path: str, base_model: str, device: str) -> Any:
+    """Build the Gradio interface and warm the model before launch."""
     import gradio as gr  # type: ignore
 
-    # Pre-load model
+    # Surface startup issues before the UI is served.
     load_model(adapter_path, base_model, device)
 
     def _diagnose(species, age, sex, breed, complaint, temperature, max_new_tokens):
@@ -259,7 +267,7 @@ def build_demo(adapter_path: str, base_model: str, device: str):
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="VetQwen Gradio Demo")
+    parser = argparse.ArgumentParser(description="Launch the VetQwen Gradio demo.")
     parser.add_argument(
         "--adapter",
         type=str,
@@ -288,7 +296,10 @@ def main() -> None:
         type=str,
         default="auto",
         choices=["auto", "cpu", "cuda", "mps"],
-        help="Inference device to use (default: auto). On MacBook Apple Silicon, use --device mps or --device auto.",
+        help=(
+            "Inference device to use (default: auto). On Apple Silicon Macs, "
+            "use --device mps or keep --device auto."
+        ),
     )
     args = parser.parse_args()
 

@@ -1,5 +1,5 @@
 """
-compare_results.py — compare VetQwen baseline vs candidate evaluation runs.
+compare_results.py — compare VetQwen baseline and candidate evaluation runs.
 
 Usage:
     python scripts/compare_results.py \
@@ -26,7 +26,7 @@ MAX_SOURCE_REGRESSION = 0.10
 
 
 def load_json(path: str | Path) -> dict[str, Any]:
-    with Path(path).open() as handle:
+    with Path(path).open(encoding="utf-8") as handle:
         return json.load(handle)
 
 
@@ -101,6 +101,7 @@ def collect_source_guardrails(
     baseline_result: dict[str, Any],
     candidate_result: dict[str, Any],
 ) -> list[dict[str, Any]]:
+    """Collect guarded source regressions that exceed the allowed tolerance."""
     regressions: list[dict[str, Any]] = []
     for source_name in SOURCE_GUARDRAIL_SOURCES:
         for metric_name in SOURCE_GUARDRAIL_METRICS:
@@ -147,6 +148,7 @@ def build_comparison(
     baseline_judge: dict[str, Any] | None,
     candidate_judge: dict[str, Any] | None,
 ) -> dict[str, Any]:
+    """Assemble metric deltas, gate checks, and source guardrail outcomes."""
     tracked_metrics = [
         "diagnosis_hit_rate",
         "parse_success_rate",
@@ -266,6 +268,7 @@ def comparison_markdown(
     baseline_result: dict[str, Any],
     candidate_result: dict[str, Any],
 ) -> str:
+    """Render a human-readable markdown summary from comparison data."""
     lines = [
         "# VetQwen Comparison Summary",
         "",
@@ -390,7 +393,9 @@ def derive_default_output(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Compare baseline and candidate VetQwen runs")
+    parser = argparse.ArgumentParser(
+        description="Compare baseline and candidate VetQwen runs."
+    )
     parser.add_argument("--baseline", required=True, help="Baseline metrics JSON path")
     parser.add_argument("--candidate", required=True, help="Candidate metrics JSON path")
     parser.add_argument(
@@ -406,13 +411,20 @@ def main() -> None:
     parser.add_argument(
         "--output",
         default=None,
-        help="Markdown output path (default: results/comparisons/<candidate>_vs_<baseline>.md)",
+        help=(
+            "Markdown output path (default: "
+            "results/comparisons/<candidate>_vs_<baseline>.md)"
+        ),
     )
     args = parser.parse_args()
 
     baseline_path = Path(args.baseline)
     candidate_path = Path(args.candidate)
-    output_path = Path(args.output) if args.output else derive_default_output(baseline_path, candidate_path)
+    output_path = (
+        Path(args.output)
+        if args.output
+        else derive_default_output(baseline_path, candidate_path)
+    )
 
     baseline_result = load_json(baseline_path)
     candidate_result = load_json(candidate_path)
@@ -430,10 +442,10 @@ def main() -> None:
     markdown = comparison_markdown(comparison, baseline_result, candidate_result)
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(markdown)
+    output_path.write_text(markdown, encoding="utf-8")
 
     sidecar_path = output_path.with_suffix(".json")
-    sidecar_path.write_text(json.dumps(comparison, indent=2))
+    sidecar_path.write_text(json.dumps(comparison, indent=2), encoding="utf-8")
 
     print(f"Comparison summary written to {output_path}")
     print(f"Comparison JSON written to {sidecar_path}")

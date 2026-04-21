@@ -47,8 +47,8 @@ HF_SOURCES = [
   "infinite-dataset-hub/VetPetCare",
 ]
 
-DEDUP_THRESHOLD = 0.95 # cosine similarity above this → drop duplicate
-SPLIT_RATIOS = (0.80, 0.10, 0.10) # train / val / test
+DEDUP_THRESHOLD = 0.95  # Cosine similarity above this threshold is dropped.
+SPLIT_RATIOS = (0.80, 0.10, 0.10)  # train / val / test
 RANDOM_SEED = 42
 TARGET_SPECIES = {"dog", "cat", "cattle", "pig", "sheep"}
 
@@ -247,6 +247,8 @@ def canonicalize_condition(value: Any) -> str | None:
   text = re.sub(r"[^a-z0-9\s/&-]", "", text)
   text = re.sub(r"\s+", " ", text).strip(" -")
   return text or None
+
+
 def is_urgent_triage(value: Any) -> bool:
   return canonicalize_triage(value) == "Urgent"
 
@@ -302,6 +304,7 @@ def select_condition_label(
   diagnosis_text: str,
   complaint_text: str,
 ) -> tuple[str | None, str | None]:
+  """Pick the best condition label and record how it was derived."""
   diagnosis = cleanup_condition_text(diagnosis_text)
   complaint = cleanup_condition_text(complaint_text)
 
@@ -316,6 +319,7 @@ def select_condition_label(
 
 
 def detect_species_from_text(text: str) -> str:
+  """Infer species by scanning free text for known aliases."""
   lowered = clean_text(text).casefold()
   if not lowered:
     return "unknown"
@@ -345,6 +349,7 @@ def normalize_species(
 
 
 def infer_triage(symptoms: str, diagnosis: str = "") -> str:
+  """Infer a coarse triage label from symptom and diagnosis text."""
   combined = f"{clean_text(symptoms)} {clean_text(diagnosis)}".casefold()
   if any(keyword in combined for keyword in URGENT_TRIAGE_PATTERNS):
     return "Urgent"
@@ -361,7 +366,7 @@ def infer_triage(symptoms: str, diagnosis: str = "") -> str:
 def load_hf_dataset(repo_id: str) -> list[dict]:
   """Download a dataset from Hugging Face Hub and return raw records as a list of dicts."""
   try:
-    from datasets import load_dataset # type: ignore
+    from datasets import load_dataset  # type: ignore
   except ImportError as exc:
     raise SystemExit(
       "Missing dependency: 'datasets'.\n"
@@ -1052,6 +1057,7 @@ def log_species_counts(samples: list[dict[str, Any]], label: str) -> None:
 
 
 def main(args: argparse.Namespace) -> None:
+  """Build the processed VetQwen dataset and duplicate audit outputs."""
   output_dir = Path(args.output_dir)
 
   raw_source_records = {repo_id: load_hf_dataset(repo_id) for repo_id in HF_SOURCES}
@@ -1096,7 +1102,7 @@ def main(args: argparse.Namespace) -> None:
     output_path = output_dir / f"{split_name}.jsonl"
     write_jsonl(records, output_path)
     log.info("Wrote %s records to %s", len(records), output_path)
-  with (output_dir / "duplicate_audit.json").open("w") as handle:
+  with (output_dir / "duplicate_audit.json").open("w", encoding="utf-8") as handle:
     json.dump(duplicate_audit, handle, indent=2)
   log.info(
     "Duplicate audit saved to %s (exact=%s, near=%s)",
@@ -1109,7 +1115,9 @@ def main(args: argparse.Namespace) -> None:
 
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser(description="Build VetQwen training dataset")
+  parser = argparse.ArgumentParser(
+    description="Build the processed VetQwen training dataset."
+  )
   parser.add_argument(
     "--synthetic",
     type=str,

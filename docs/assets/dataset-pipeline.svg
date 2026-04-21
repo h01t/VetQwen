@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="860" viewBox="0 0 1200 860" role="img" aria-labelledby="title desc">
+  <title id="title">VetQwen dataset pipeline</title>
+  <desc id="desc">Flowchart showing upstream datasets, synthetic generation, normalization, filtering, deduplication, splitting, and audit outputs.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="5" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#4f6d7a" />
+    </marker>
+  </defs>
+  <rect width="1200" height="860" fill="#f8fafc" />
+  <text x="60" y="72" font-family="Helvetica, Arial, sans-serif" font-size="34" font-weight="700" fill="#183642">Dataset Construction and Preprocessing</text>
+
+  <g font-family="Helvetica, Arial, sans-serif">
+    <rect x="84" y="132" width="292" height="130" rx="18" fill="#ffffff" stroke="#8fb7c1" stroke-width="2" />
+    <text x="116" y="180" font-size="27" font-weight="700" fill="#183642">Public Sources</text>
+    <text x="116" y="216" font-size="18" fill="#46606a">pet-health-symptoms-dataset</text>
+    <text x="116" y="246" font-size="18" fill="#46606a">VetHealthAssessment</text>
+
+    <rect x="84" y="306" width="292" height="130" rx="18" fill="#ffffff" stroke="#8fb7c1" stroke-width="2" />
+    <text x="116" y="354" font-size="27" font-weight="700" fill="#183642">Structured Source</text>
+    <text x="116" y="390" font-size="18" fill="#46606a">VetPetCare</text>
+    <text x="116" y="420" font-size="18" fill="#46606a">diagnosis-oriented examples</text>
+
+    <rect x="84" y="480" width="292" height="130" rx="18" fill="#ffffff" stroke="#8fb7c1" stroke-width="2" />
+    <text x="116" y="528" font-size="27" font-weight="700" fill="#183642">Synthetic Cases</text>
+    <text x="116" y="564" font-size="18" fill="#46606a">generate_synthetic.py</text>
+    <text x="116" y="594" font-size="18" fill="#46606a">livestock coverage via Ollama</text>
+
+    <rect x="460" y="188" width="294" height="130" rx="18" fill="#dff1f6" stroke="#6faab8" stroke-width="2" />
+    <text x="506" y="236" font-size="27" font-weight="700" fill="#183642">Normalization</text>
+    <text x="496" y="272" font-size="18" fill="#46606a">source-specific mapping into ChatML</text>
+    <text x="496" y="302" font-size="18" fill="#46606a">canonical _meta fields</text>
+
+    <rect x="460" y="390" width="294" height="130" rx="18" fill="#dff1f6" stroke="#6faab8" stroke-width="2" />
+    <text x="504" y="438" font-size="27" font-weight="700" fill="#183642">Filtering</text>
+    <text x="490" y="474" font-size="18" fill="#46606a">target species only: dog, cat, cattle,</text>
+    <text x="490" y="504" font-size="18" fill="#46606a">pig, sheep</text>
+
+    <rect x="460" y="592" width="294" height="130" rx="18" fill="#dff1f6" stroke="#6faab8" stroke-width="2" />
+    <text x="502" y="640" font-size="27" font-weight="700" fill="#183642">Deduplication</text>
+    <text x="490" y="676" font-size="18" fill="#46606a">sentence-transformer similarity</text>
+    <text x="490" y="706" font-size="18" fill="#46606a">threshold = 0.95</text>
+
+    <rect x="846" y="188" width="272" height="130" rx="18" fill="#fbead3" stroke="#d0a364" stroke-width="2" />
+    <text x="900" y="236" font-size="27" font-weight="700" fill="#183642">Stratified Split</text>
+    <text x="884" y="272" font-size="18" fill="#46606a">80 / 10 / 10 by species + condition</text>
+    <text x="884" y="302" font-size="18" fill="#46606a">singleton buckets stay in train</text>
+
+    <rect x="846" y="390" width="272" height="130" rx="18" fill="#fbead3" stroke="#d0a364" stroke-width="2" />
+    <text x="900" y="438" font-size="27" font-weight="700" fill="#183642">Coverage Guardrails</text>
+    <text x="882" y="474" font-size="18" fill="#46606a">ensure labeled and urgent cases</text>
+    <text x="882" y="504" font-size="18" fill="#46606a">appear in evaluation splits</text>
+
+    <rect x="846" y="592" width="272" height="130" rx="18" fill="#fbead3" stroke="#d0a364" stroke-width="2" />
+    <text x="918" y="640" font-size="27" font-weight="700" fill="#183642">Outputs</text>
+    <text x="880" y="676" font-size="18" fill="#46606a">train.jsonl / val.jsonl / test.jsonl</text>
+    <text x="880" y="706" font-size="18" fill="#46606a">duplicate_audit.json</text>
+
+    <line x1="376" y1="198" x2="460" y2="252" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+    <line x1="376" y1="370" x2="460" y2="252" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+    <line x1="376" y1="544" x2="460" y2="252" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+    <line x1="607" y1="318" x2="607" y2="390" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+    <line x1="607" y1="520" x2="607" y2="592" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+    <line x1="754" y1="252" x2="846" y2="252" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+    <line x1="982" y1="318" x2="982" y2="390" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+    <line x1="982" y1="520" x2="982" y2="592" stroke="#4f6d7a" stroke-width="4" marker-end="url(#arrow)" />
+  </g>
+</svg>

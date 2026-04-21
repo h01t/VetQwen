@@ -69,6 +69,10 @@ data/review/*
 .DS_Store
 Thumbs.db
 
+# Local export artifacts
+docs/*.pdf
+docs/**/*.pdf
+
 # IDEs
 .vscode/
 .idea/

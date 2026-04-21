@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="820" viewBox="0 0 1280 820" role="img" aria-labelledby="title desc">
+  <title id="title">VetQwen demo interface preview</title>
+  <desc id="desc">A stylized screenshot of the VetQwen Gradio demo showing patient input controls and a structured diagnostic response.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f7fbff" />
+      <stop offset="100%" stop-color="#eef4f7" />
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="10" stdDeviation="16" flood-color="#0f172a" flood-opacity="0.12" />
+    </filter>
+  </defs>
+
+  <rect width="1280" height="820" fill="url(#bg)" />
+  <rect x="40" y="36" width="1200" height="748" rx="26" fill="#ffffff" filter="url(#shadow)" />
+
+  <rect x="40" y="36" width="1200" height="82" rx="26" fill="#0f4c5c" />
+  <circle cx="88" cy="77" r="8" fill="#ff6b6b" />
+  <circle cx="116" cy="77" r="8" fill="#ffd166" />
+  <circle cx="144" cy="77" r="8" fill="#6bcf8b" />
+  <text x="186" y="84" fill="#ffffff" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="700">VetQwen - Veterinary Diagnostic Assistant</text>
+  <text x="988" y="84" fill="#d6e8ed" font-family="Helvetica, Arial, sans-serif" font-size="18">demo preview</text>
+
+  <text x="88" y="170" fill="#12343b" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="700">Patient Information</text>
+  <text x="720" y="170" fill="#12343b" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="700">Diagnostic Assessment</text>
+
+  <g font-family="Helvetica, Arial, sans-serif">
+    <rect x="82" y="196" width="462" height="74" rx="14" fill="#f6fafb" stroke="#d7e4e8" />
+    <text x="106" y="223" fill="#5b7580" font-size="16">Species</text>
+    <text x="106" y="252" fill="#17353c" font-size="22" font-weight="600">Dog</text>
+
+    <rect x="82" y="286" width="220" height="74" rx="14" fill="#f6fafb" stroke="#d7e4e8" />
+    <text x="106" y="313" fill="#5b7580" font-size="16">Age</text>
+    <text x="106" y="342" fill="#17353c" font-size="22" font-weight="600">3 years</text>
+
+    <rect x="324" y="286" width="220" height="74" rx="14" fill="#f6fafb" stroke="#d7e4e8" />
+    <text x="348" y="313" fill="#5b7580" font-size="16">Sex / Reproductive Status</text>
+    <text x="348" y="342" fill="#17353c" font-size="22" font-weight="600">Male (neutered)</text>
+
+    <rect x="82" y="376" width="462" height="74" rx="14" fill="#f6fafb" stroke="#d7e4e8" />
+    <text x="106" y="403" fill="#5b7580" font-size="16">Breed</text>
+    <text x="106" y="432" fill="#17353c" font-size="22" font-weight="600">Golden Retriever</text>
+
+    <rect x="82" y="468" width="462" height="170" rx="14" fill="#f6fafb" stroke="#d7e4e8" />
+    <text x="106" y="495" fill="#5b7580" font-size="16">Presenting Complaint / Symptoms</text>
+    <text x="106" y="530" fill="#17353c" font-size="20">Owner reports 2 days of lethargy, vomiting,</text>
+    <text x="106" y="562" fill="#17353c" font-size="20">loss of appetite, and bloody diarrhea.</text>
+
+    <rect x="82" y="660" width="462" height="56" rx="28" fill="#1f7a8c" />
+    <text x="170" y="696" fill="#ffffff" font-size="21" font-weight="700">Generate Diagnostic Assessment</text>
+
+    <rect x="672" y="196" width="526" height="520" rx="18" fill="#fcfeff" stroke="#d7e4e8" />
+    <text x="704" y="238" fill="#0f172a" font-size="18" font-weight="700">VetQwen Response</text>
+
+    <text x="704" y="286" fill="#12343b" font-size="20" font-weight="700">Species &amp; Signalment:</text>
+    <text x="928" y="286" fill="#12343b" font-size="20">Dog, 3 years, male neutered, Golden Retriever</text>
+
+    <text x="704" y="332" fill="#12343b" font-size="20" font-weight="700">Presenting Symptoms:</text>
+    <text x="928" y="332" fill="#12343b" font-size="20">Lethargy, vomiting, anorexia, bloody diarrhea</text>
+
+    <text x="704" y="386" fill="#12343b" font-size="20" font-weight="700">Assessment:</text>
+    <text x="704" y="418" fill="#17353c" font-size="19">The combination of gastrointestinal signs and hematochezia</text>
+    <text x="704" y="448" fill="#17353c" font-size="19">supports an acute inflammatory or infectious enteropathy.</text>
+
+    <text x="704" y="502" fill="#12343b" font-size="20" font-weight="700">Differential Diagnoses:</text>
+    <text x="722" y="536" fill="#17353c" font-size="19">1. Hemorrhagic gastroenteritis - acute bloody diarrhea pattern</text>
+    <text x="722" y="566" fill="#17353c" font-size="19">2. Canine parvoviral enteritis - rule out in high-risk patients</text>
+    <text x="722" y="596" fill="#17353c" font-size="19">3. Dietary indiscretion / toxin exposure - supportive history needed</text>
+
+    <text x="704" y="650" fill="#12343b" font-size="20" font-weight="700">Triage Recommendation:</text>
+    <text x="964" y="650" fill="#a63a50" font-size="20" font-weight="700">Urgent</text>
+
+    <text x="704" y="692" fill="#12343b" font-size="20" font-weight="700">Suggested Next Steps:</text>
+    <text x="704" y="724" fill="#17353c" font-size="19">Immediate veterinary exam, hydration assessment, CBC/chemistry,</text>
+    <text x="704" y="754" fill="#17353c" font-size="19">fecal testing, and parvovirus screening if clinically indicated.</text>
+  </g>
+</svg>
